@@ -1,0 +1,12 @@
+*.iml
+.idea
+.venv
+target
+streamlit/conf
+streamlit/sql
+streamlit/jdbc_jar
+streamlit/data
+streamlit/config.ini.template
+streamlit/log4j.properties
+streamlit/*.log
+streamlit/*.jar

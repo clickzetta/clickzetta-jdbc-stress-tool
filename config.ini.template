@@ -1,0 +1,14 @@
+# fill jdbc url here
+url=
+# fill username here
+username=
+# fill password here
+password=
+
+# following parameters are optional
+# optional, default pool type is hikari
+pool=hikari|dbcp|druid
+# init sql, disable result cache
+init=set cz.optimizer.enable.result.cache=false;set cz.optimizer.enable.result.cache.reuse=false;select 1;
+# driver class, not necessary for modern jdbc drivers
+driver=com.clickzetta.client.jdbc.ClickZettaDriver

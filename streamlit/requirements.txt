@@ -1,0 +1,6 @@
+pandas
+numpy
+streamlit
+streamlit-aggrid
+altair
+Pillow
