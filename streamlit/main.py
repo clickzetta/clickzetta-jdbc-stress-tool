@@ -243,7 +243,12 @@ with col_conf_and_run:
     cols[0].subheader('1. Define stress:')
     cols[1].info('How many SQLs and JDBC concurrency')
     sqls = cols[0].file_uploader("Upload new sql file(s)", accept_multiple_files=True)
-    existing_sqls = cols[1].multiselect('Choose existing sql files', list_files('sql'))
+    all_sqls = list_files('sql')
+    select_all_sqls = cols[1].checkbox('Select all', value=False)
+    if select_all_sqls:
+        existing_sqls = cols[1].multiselect('Choose existing sql files', all_sqls, [s for s in all_sqls if s])
+    else:
+        existing_sqls = cols[1].multiselect('Choose existing sql files', all_sqls)
     repeat = cols[1].number_input('Repeat times of SQLs', value=100, min_value=1, step=1)
     thread = cols[1].number_input('JDBC Concurrency', value=20, min_value=1, step=1)
     st.divider()
@@ -339,7 +344,7 @@ if existing_test:
 elif run and 'pid' not in st.session_state:
     conf_path = existing_conf
     sql_paths = existing_sqls
-    sql_path = ','.join(existing_sqls)
+    sql_path = ','.join([p for p in sql_paths if p])
     jdbc_path = ':'.join(existing_jdbc)
     if jdk9:
         jvm_param = f'--add-opens=java.base/java.nio=ALL-UNNAMED {jvm_param}'
