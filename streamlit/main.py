@@ -367,8 +367,7 @@ elif run and 'pid' not in st.session_state:
         output_log = f'{test_folder}/{named_test}.log'
         pid_file = f'{test_folder}/{named_test}.pid'
         cmd = f'java {jvm_param}' + \
-              f' -cp jdbc-stress-tool-1.0-jar-with-dependencies.jar:clickzetta-java-1.0.1-jar-with-dependencies.jar:{jdbc_path}' + \
-              ' -Dlog4j.configuration=file:log4j.properties' + \
+              f' -cp jdbc-stress-tool-1.0-jar-with-dependencies.jar:clickzetta-java-1.0.2-jar-with-dependencies.jar:{jdbc_path}' + \
               ' com.clickzetta.jdbc_stress_tool.Main' + \
               f' -c {conf_path}' + \
               f' -q {sql_path}' + \

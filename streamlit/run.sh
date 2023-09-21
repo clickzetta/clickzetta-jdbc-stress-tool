@@ -15,9 +15,9 @@ then
   ln -s ../target/jdbc-stress-tool-1.0-jar-with-dependencies.jar
 fi
 
-if [ ! -f clickzetta-java-1.0.1-jar-with-dependencies.jar ]
+if [ ! -f clickzetta-java-1.0.2-jar-with-dependencies.jar ]
 then
-  wget https://autolake-dev-beijing.oss-cn-beijing.aliyuncs.com/clickzetta-tool/release/clickzetta-java-1.0.1-jar-with-dependencies.jar
+  wget https://autolake-dev-beijing.oss-cn-beijing.aliyuncs.com/clickzetta-tool/release/clickzetta-java-1.0.2-jar-with-dependencies.jar
 fi
 
 streamlit run --browser.gatherUsageStats false main.py

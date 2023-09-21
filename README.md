@@ -18,7 +18,7 @@ Screenshot
 
 1. Prepare image, `docker pull clickzetta/jdbc-stress-tool:dev` or `./build.sh` if you have Java 8+ develop environment ready
 2. `docker run -p 8501:8501 -v .:/mnt/userdata clickzetta/jdbc-stress-tool:dev`
-3. Open http://localhost:8051 in your browser
+3. Open http://localhost:8501 in your browser
 
 ### Local compile and deploy
 
