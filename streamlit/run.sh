@@ -5,11 +5,6 @@ then
   ln -s ../config.ini.template
 fi
 
-if [ ! -f log4j.properties ]
-then
-  ln -s ../log4j.properties
-fi
-
 if [ ! -f jdbc-stress-tool-1.0-jar-with-dependencies.jar ]
 then
   ln -s ../target/jdbc-stress-tool-1.0-jar-with-dependencies.jar
