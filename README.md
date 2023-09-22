@@ -16,21 +16,21 @@ Screenshot
 
 ### Run in docker
 
-1. Prepare image, `docker pull clickzetta/jdbc-stress-tool:dev` or `./build.sh` if you have Java 8+ develop environment ready
-2. `docker run -p 8501:8501 -v .:/mnt/userdata clickzetta/jdbc-stress-tool:dev`
-3. Open http://localhost:8501 in your browser
+1. Prepare image by run `./build.sh`, Java 8+ and maven needed.
+2. `docker run -p 8501:8501 -v .:/mnt/userdata clickzetta/jdbc-stress-tool:dev`, test data will be stored at local path `./`,  change it as you wish.
+3. Open http://localhost:8501 in your browser.
 
 ### Local compile and deploy
 
 #### Compile jdbc-stress-tool
 
-Have your Java(8+) development environment ready and run
+Prepare Java(8+) development environment as well as maven.
 
 `mvn package`
 
 #### Run WebUI
 
-Have your Python(3.9+) environment ready.
+Prepare Python(3.9+) environment.
 
 Get dependency packages installed
 ```shell
