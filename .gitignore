@@ -6,6 +6,7 @@ streamlit/conf
 streamlit/sql
 streamlit/jdbc_jar
 streamlit/data
+streamlit/download
 streamlit/config.ini.template
 streamlit/log4j.properties
 streamlit/*.log

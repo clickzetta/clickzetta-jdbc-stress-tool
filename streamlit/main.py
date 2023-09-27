@@ -2,10 +2,10 @@ import os
 from datetime import datetime
 import subprocess
 import pandas as pd
-import numpy as np
 from pathlib import Path
 import signal
 import time
+import shutil
 from io import StringIO
 from threading import Thread
 from contextlib import contextmanager, redirect_stdout
@@ -38,14 +38,14 @@ col_conf_and_run, col_load_and_log = st.columns(2)
 
 if 'VOLUME' in os.environ: # for docker
     vol = os.environ['VOLUME']
-    for path in ['conf', 'sql', 'jdbc_jar', 'data']:
+    for path in ['conf', 'sql', 'jdbc_jar', 'data', 'download']:
         src = f'{vol}/{path}'
         if not os.path.exists(src):
             os.mkdir(src)
         if not os.path.exists(path):
             os.symlink(src, path)
 else:
-    for path in ['conf', 'sql', 'jdbc_jar', 'data']:
+    for path in ['conf', 'sql', 'jdbc_jar', 'data', 'download']:
         if not os.path.exists(path):
             os.mkdir(path)
 
@@ -115,17 +115,14 @@ def load_and_display_log(log_file):
         with open(log_file) as f:
             log = f.read()
         stdout.code(log)
-        download_log.download_button('Download log', log, log_file, 'text/plain')
     except:
         pass
 
 def analyze(csv:str):
-    st.subheader('Report')
+    st.subheader(f'Report of test {st.session_state.get("test")}')
     df = None
     try:
         df = pd.read_csv(csv)
-        with open(csv) as f:
-            download_csv.download_button('Download csv', f, f'{csv}','text/csv')
     except Exception as ex:
         st.warning(f'failed to read {csv}, reason {ex}')
         return
@@ -202,7 +199,7 @@ def analyze(csv:str):
         st.altair_chart(c, use_container_width=True)
 
     # profiles
-    st.subheader('6. Profile')
+    st.subheader('Profile')
     stats = df.groupby('sql_id')['client_duration_ms'].agg(['count', 'min', 'max', 'mean', 'median'])
     stats['25%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.25)
     stats['75%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.75)
@@ -261,7 +258,6 @@ with col_conf_and_run:
     cols = st.columns([1,2])
     jvm_param = cols[0].text_input('JVM parameters', value='-Xmx4g')
     jdk9 = cols[0].checkbox('Java 9+', help='enable this will add "--add-opens=java.base/java.nio=ALL-UNNAMED" to jvm parameters')
-    named_test = cols[1].text_input('name this test (optional)', help='if not specified, test output folder/files will be named in format of "$datetime_$config.csv"')
     job_id_prefix = cols[1].text_input('job id prefix for clickzetta sql (optional)', help='if not specified, job id prefix will be empty')
     failure_rate = cols[1].slider('stop test if failure rate reach', 0, 100, 10, 1, help='test will stop if failure rate of sqls exceeds this value')
     cols = st.columns(4)
@@ -283,13 +279,38 @@ if jdbc:
 
 with col_load_and_log:
     st.subheader('5. View logs OR load existing test')
-    existing_test = st.selectbox('Load existing tests', list_folders('data'))
+    tests = list_folders('data')
+    if st.session_state.get('test'):
+        existing_test = st.selectbox('Load existing tests', tests, index=tests.index(st.session_state.get('test')))
+    else:
+        existing_test = st.selectbox('Load existing tests', tests)
     st.divider()
     test_head = st.empty()
     stdout = st.empty()
-    cols = st.columns(2)
-    download_log = cols[0].empty()
-    download_csv = cols[1].empty()
+    st.divider()
+    download_head = st.empty()
+    download = st.empty()
+
+def clear_test(_test):
+    if os.path.exists(f'data/{_test}'):
+        shutil.rmtree(f'data/{_test}')
+    if os.path.exists(f'download/{_test}.zip'):
+        os.remove(f'download/{_test}.zip')
+    st.session_state.pop('test')
+    st.session_state.pop('rename_test')
+
+def prepare_download_btn(_test):
+    if os.path.exists(f'download/{_test}'):
+        return
+    download_head.subheader('6. Rename, download or drop test data')
+    cols = download.columns([2,1,1])
+    cols[0].text_input('Rename this test', value=_test, key='rename_test', label_visibility='collapsed')
+    data_file = f'download/{_test}.zip'
+    if not os.path.exists(data_file):
+        shutil.make_archive(f'download/{_test}', 'zip', f'data/{_test}/')
+    with open(data_file, 'rb') as f:
+        cols[1].download_button('Download data as zip', f, f'{_test}.zip', 'application/zip')
+    cols[2].button('Drop this test', on_click=clear_test, args=(_test,))
 
 if stop and 'pid' in st.session_state and 'test' in st.session_state:
     test = st.session_state['test']
@@ -298,17 +319,34 @@ if stop and 'pid' in st.session_state and 'test' in st.session_state:
     print(f'stop test {test}, pid {pid}')
     os.kill(pid, signal.SIGTERM)
     try:
-        pid_file = f'data/{test}/{test}.pid'
+        pid_file = f'data/{test}/pid'
         os.remove(pid_file)
     except:
         pass
 
+if st.session_state.get('rename_test') and st.session_state.get('test'):
+    src = st.session_state.pop('test').strip()
+    dest = st.session_state.pop('rename_test').strip()
+    if src != dest:
+        try:
+            if os.path.exists(f'data/{src}/{src}.log'):
+                os.rename(f'data/{src}/{src}.log', f'data/{src}/log.txt')
+            if os.path.exists(f'data/{src}/{src}.csv'):
+                os.rename(f'data/{src}/{src}.csv', f'data/{src}/data.csv')
+            os.rename(f'data/{src}', f'data/{dest}')
+            test_head.info(f'renamed test "{src}" to "{dest}"')
+            st.session_state.pop('rename_test')
+        except:
+            pass
+    st.session_state['test'] = dest
+    st.experimental_rerun()
+
 if existing_test:
     test = existing_test
     st.session_state['test'] = test
-    pid_file = f'data/{test}/{test}.pid'
-    log_file = f'data/{test}/{test}.log'
-    csv_file = f'data/{test}/{test}.csv'
+    pid_file = f'data/{test}/pid'
+    log_file = f'data/{test}/{test}.log' if os.path.exists(f'data/{test}/{test}.log') else f'data/{test}/log.txt'
+    csv_file = f'data/{test}/{test}.csv' if os.path.exists(f'data/{test}/{test}.csv') else f'data/{test}/data.csv'
     if os.path.exists(pid_file): # test is still running
         with open(pid_file, 'r') as f:
             pid = int(f.read())
@@ -328,10 +366,12 @@ if existing_test:
         if 'pid' in st.session_state:
             st.session_state.pop('pid')
         load_and_display_log(log_file)
+        prepare_download_btn(test)
         analyze(csv_file)
     else: # test finished
         test_head.info(f'Load existing test: {test}')
         load_and_display_log(log_file)
+        prepare_download_btn(test)
         analyze(csv_file)
 elif run and 'pid' not in st.session_state:
     conf_path = existing_conf
@@ -346,18 +386,17 @@ elif run and 'pid' not in st.session_state:
     elif not sql_path:
         stdout.error('please select sql files')
     else:
-        if not named_test:
-            now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-            conf = conf_path.split("/")[1].split(".")[0]
-            named_test = f'{now}_{conf}'
+        now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        conf = conf_path.split("/")[1].split(".")[0]
+        test = f'{now}_{conf}'
 
-        test_head.info(f'run new test : {named_test}')
-        st.session_state['test'] = named_test
-        test_folder = f'data/{named_test}'
+        test_head.info(f'run new test : {test}')
+        st.session_state['test'] = test
+        test_folder = f'data/{test}'
         os.mkdir(test_folder)
-        output_csv = f'{test_folder}/{named_test}.csv'
-        output_log = f'{test_folder}/{named_test}.log'
-        pid_file = f'{test_folder}/{named_test}.pid'
+        output_csv = f'{test_folder}/data.csv'
+        output_log = f'{test_folder}/log.txt'
+        pid_file = f'{test_folder}/pid'
         cmd = f'java {jvm_param}' + \
               f' -cp jdbc-stress-tool-1.0-jar-with-dependencies.jar:clickzetta-java-1.0.2-jar-with-dependencies.jar:{jdbc_path}' + \
               ' com.clickzetta.jdbc_stress_tool.Main' + \
@@ -386,4 +425,5 @@ elif run and 'pid' not in st.session_state:
         if 'pid' in st.session_state:
             st.session_state.pop('pid')
         load_and_display_log(output_log)
+        prepare_download_btn(test)
         analyze(output_csv)
