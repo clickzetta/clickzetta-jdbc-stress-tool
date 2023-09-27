@@ -16,7 +16,7 @@ Screenshot
 
 ### Run in docker
 
-1. Prepare image by run `./build.sh`, Java 8+ and maven needed.
+1. Pull image from [dockerhub](https://hub.docker.com/r/clickzetta/jdbc-stress-tool/tags) `docker pull clickzetta/jdbc-stress-tool:dev`
 2. `docker run -p 8501:8501 -v .:/mnt/userdata clickzetta/jdbc-stress-tool:dev`, test data will be stored at local path `./`,  change it as you wish.
 3. Open http://localhost:8501 in your browser.
 

@@ -193,14 +193,6 @@ def analyze(csv:str):
                                'client_duration_ms.min': 'min',
                                'client_duration_ms.max': 'max'}, inplace=True)
 
-        builder = GridOptionsBuilder.from_dataframe(df_agg)
-        builder.configure_column("client_start_time", type=["customDateTimeFormat"], custom_format_string='yyyy-MM-dd HH:mm:ss.SSS zzz')
-        go = builder.build()
-        AgGrid(df_agg, height=400, gridOptions=go,
-            use_container_width=True, columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
-            excel_export_mode=ExcelExportMode.TRIGGER_DOWNLOAD,
-            enable_enterprise_modules=True, update_mode=GridUpdateMode.SELECTION_CHANGED, reload_data=True)
-
         c = alt.layer(
             alt.Chart(df_agg).mark_point(filled=False).encode(y=alt.Y('mean'), color='sql_id'),
             alt.Chart(df_agg).mark_errorbar().encode(y=alt.Y('min', title=None), y2='max', color='sql_id')
