@@ -131,7 +131,7 @@ def analyze(csv:str):
     qps = 1000.0 * len(df) / duration
     st.code('current sql count {:,} \t time elapsed {:,} ms \t qps {:.3f}'.format(len(df), duration, qps))
     row_count = len(df)
-    if row_count > RENDER_LIMIT:
+    if row_count >= RENDER_LIMIT:
         st.warning(f'too many data({row_count} rows), show aggregated chart only')
 
     df['overhead_ms'] = df['client_duration_ms'] - df['server_duration_ms']
@@ -141,7 +141,7 @@ def analyze(csv:str):
     df['sdk_overhead_ms'] = df['client_duration_ms'] - (df['client_response_ms'] - df['client_request_ms'])
     df['network_ms'] = df['overhead_ms'] - df['gateway_overhead_ms'] - df['sdk_overhead_ms']
 
-    if row_count <= RENDER_LIMIT: # detailed charts
+    if row_count < RENDER_LIMIT: # detailed charts
         df_table = df[['thread_name', 'sql_id', 'job_id', 'is_success',
                 'client_duration_ms', 'server_duration_ms',
                 # 'overhead_ms', 'sdk_overhead_ms', 'gateway_overhead_ms', 'network_ms',
@@ -230,29 +230,52 @@ def analyze(csv:str):
 with col_conf_and_run:
     cols = st.columns([1,2])
     cols[0].subheader('1. Define stress:')
-    cols[1].info('How many SQLs and JDBC concurrency')
-    sqls = cols[0].file_uploader("Upload new sql file(s)", accept_multiple_files=True)
+    cols[1].info('SQLs to run and client concurrency')
+    uploaded_sqls = None
+    with cols[0].form('upload_sql', clear_on_submit=True):
+        sqls = st.file_uploader("Upload new sql file(s)", accept_multiple_files=True)
+        submitted = st.form_submit_button("UPLOAD")
+        if submitted and sqls is not None:
+            uploaded = save_files(sqls, 'sql')
+            if 'selected_sqls' in st.session_state:
+                st.session_state['selected_sqls'].append(uploaded)
+            else:
+                st.session_state['selected_sqls'] = uploaded
     all_sqls = list_files('sql')
     select_all_sqls = cols[1].checkbox('Select all', value=False)
     if select_all_sqls:
-        existing_sqls = cols[1].multiselect('Choose existing sql files', all_sqls, [s for s in all_sqls if s])
-    else:
-        existing_sqls = cols[1].multiselect('Choose existing sql files', all_sqls)
+        st.session_state['selected_sqls'] = [s for s in all_sqls if s]
+    existing_sqls = cols[1].multiselect('Choose existing sql files', all_sqls, st.session_state.get('selected_sqls'))
     repeat = cols[1].number_input('Repeat times of SQLs', value=100, min_value=1, step=1)
     thread = cols[1].number_input('JDBC Concurrency', value=20, min_value=1, step=1)
     st.divider()
     cols = st.columns([1,2])
     cols[0].subheader('2. Define target:')
-    cols[1].info('clickzetta-java included, NO need to upload')
-    conf = cols[0].file_uploader("Upload new config file", accept_multiple_files=False)
-    existing_conf = cols[1].selectbox('Choose existing config file', list_files('conf'))
+    cols[1].info('Database and JDBC Driver')
+    with cols[0].form('upload_conf', clear_on_submit=True):
+        conf = st.file_uploader("Upload new config file")
+        submitted = st.form_submit_button("UPLOAD")
+        if submitted and conf is not None:
+            uploaded = save_file(conf, 'conf')
+            st.session_state['selected_conf'] = uploaded
+    all_confs = list_files('conf')
+    idx = 0
+    if st.session_state.get('selected_conf'):
+        idx = all_confs.index(st.session_state.get('selected_conf'))
+    existing_conf = cols[1].selectbox('Choose existing config file', all_confs, idx)
     with cols[1].expander('Config file template'):
         with open('config.ini.template') as f:
             conf_template = f.read()
         st.code(conf_template, language='ini')
     cols = st.columns([1,2])
-    jdbc = cols[0].file_uploader('Upload new JDBC Jar', accept_multiple_files=True)
-    existing_jdbc = cols[1].multiselect('Choose existing jdbc jars', list_files('jdbc_jar'))
+    with cols[0].form('upload_jdbc', clear_on_submit=True):
+        jdbc = st.file_uploader('Upload new JDBC Jar', type=['jar', 'zip'], accept_multiple_files=True)
+        submitted = st.form_submit_button("UPLOAD")
+        if submitted and conf is not None:
+            uploaded = save_files(jdbc, 'jdbc_jar')
+            st.session_state['selected_jar'] = uploaded
+    cols[1].info('No need to upload or specify ClickZetta JDBC Driver')
+    existing_jdbc = cols[1].multiselect('Choose existing jdbc jars', list_files('jdbc_jar'), st.session_state.get('selected_jar'))
     st.divider()
     st.subheader('3. (optional) Define runtime parameters:')
     cols = st.columns([1,2])
@@ -265,25 +288,25 @@ with col_conf_and_run:
     run = cols[2].button('RUN')
     stop = cols[3].button('STOP')
 
-if conf:
-    uploaded = save_file(conf, 'conf')
-    existing_conf = uploaded
-
-if sqls:
-    uploaded = save_files(sqls, 'sql')
-    existing_sqls = uploaded
-
-if jdbc:
-    uploaded = save_files(jdbc, 'jdbc_jar')
-    existing_jdbc = uploaded
-
 with col_load_and_log:
-    st.subheader('5. View logs OR load existing test')
+    st.subheader('5. Browse existing test or upload data')
+    cols = st.columns(2)
     tests = list_folders('data')
+    idx = 0
     if st.session_state.get('test'):
-        existing_test = st.selectbox('Load existing tests', tests, index=tests.index(st.session_state.get('test')))
-    else:
-        existing_test = st.selectbox('Load existing tests', tests)
+        idx = tests.index(st.session_state.get('test'))
+    existing_test = cols[0].selectbox('Browse existing tests', tests, idx)
+    with cols[1].form("upload_zip", clear_on_submit=True):
+        zip = st.file_uploader("Upload zip file", type=['zip'])
+        submitted = st.form_submit_button("UPLOAD")
+        if submitted and zip is not None:
+            test = zip.name[:-4]
+            zip_file = save_file(zip, 'download')
+            os.mkdir(f'data/{test}')
+            shutil.unpack_archive(zip_file, f'data/{test}')
+            st.session_state['test'] = test
+            st.experimental_rerun()
+
     st.divider()
     test_head = st.empty()
     stdout = st.empty()
@@ -307,7 +330,7 @@ def prepare_download_btn(_test):
     cols[0].text_input('Rename this test', value=_test, key='rename_test', label_visibility='collapsed')
     data_file = f'download/{_test}.zip'
     if not os.path.exists(data_file):
-        shutil.make_archive(f'download/{_test}', 'zip', f'data/{_test}/')
+        shutil.make_archive(f'download/{_test}', 'zip', f'data/{_test}/', '.')
     with open(data_file, 'rb') as f:
         cols[1].download_button('Download data as zip', f, f'{_test}.zip', 'application/zip')
     cols[2].button('Drop this test', on_click=clear_test, args=(_test,))
@@ -345,8 +368,12 @@ if existing_test:
     test = existing_test
     st.session_state['test'] = test
     pid_file = f'data/{test}/pid'
-    log_file = f'data/{test}/{test}.log' if os.path.exists(f'data/{test}/{test}.log') else f'data/{test}/log.txt'
-    csv_file = f'data/{test}/{test}.csv' if os.path.exists(f'data/{test}/{test}.csv') else f'data/{test}/data.csv'
+    log_file = f'data/{test}/log.txt'
+    csv_file = f'data/{test}/data.csv'
+    if os.path.exists(f'data/{test}/{test}.log'):
+        os.rename(f'data/{test}/{test}.log', log_file)
+    if os.path.exists(f'data/{test}/{test}.csv'):
+        os.rename(f'data/{test}/{test}.csv', csv_file)
     if os.path.exists(pid_file): # test is still running
         with open(pid_file, 'r') as f:
             pid = int(f.read())
