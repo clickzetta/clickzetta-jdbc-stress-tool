@@ -6,7 +6,7 @@
     <artifactId>jdbc-stress-tool</artifactId>
     <version>1.0</version>
     <properties>
-        <clickzetta-java.version>1.0.2</clickzetta-java.version>
+        <clickzetta-java.version>1.1.1</clickzetta-java.version>
     </properties>
     <build>
         <plugins>

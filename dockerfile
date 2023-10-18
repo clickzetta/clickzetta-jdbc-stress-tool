@@ -19,7 +19,7 @@ RUN pip install -i https://mirrors.cloud.tencent.com/pypi/simple -r requirements
 
 # jdbc-stress-tool
 ADD config.ini.template config.ini.template
-RUN wget https://autolake-dev-beijing.oss-cn-beijing.aliyuncs.com/clickzetta-tool/release/clickzetta-java-1.0.2-jar-with-dependencies.jar
+RUN wget https://autolake-dev-beijing.oss-cn-beijing.aliyuncs.com/clickzetta-tool/release/clickzetta-java-1.1.1-jar-with-dependencies.jar
 ADD target/jdbc-stress-tool-1.0-jar-with-dependencies.jar jdbc-stress-tool-1.0-jar-with-dependencies.jar
 
 # streamlit webui

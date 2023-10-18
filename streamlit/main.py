@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 import subprocess
 import pandas as pd
+import numpy as np
 from pathlib import Path
 import signal
 import time
@@ -118,114 +119,14 @@ def load_and_display_log(log_file):
     except:
         pass
 
-def analyze(csv:str):
-    st.subheader(f'Report of test {st.session_state.get("test")}')
-    df = None
-    try:
-        df = pd.read_csv(csv)
-    except Exception as ex:
-        st.warning(f'failed to read {csv}, reason {ex}')
-        return
+# 定义一个函数来计算 P95 和 P99
+def percentile(n):
+    def percentile_(x):
+        return np.percentile(x, n)
+    percentile_.__name__ = 'P{}'.format(n)
+    return percentile_
 
-    duration = df['client_end_ms'].max() - df['client_start_ms'].min()
-    qps = 1000.0 * len(df) / duration
-    st.code('current sql count {:,} \t time elapsed {:,} ms \t qps {:.3f}'.format(len(df), duration, qps))
-    row_count = len(df)
-    if row_count >= RENDER_LIMIT:
-        st.warning(f'too many data({row_count} rows), show aggregated chart only')
-
-    df['overhead_ms'] = df['client_duration_ms'] - df['server_duration_ms']
-    df['server_queue_ms'] = df['server_start_ms'] - df['server_submit_ms']
-    df['server_exec_ms'] = df['server_end_ms'] - df['server_start_ms']
-    df['gateway_overhead_ms'] = df['gateway_end_ms'] - df['gateway_start_ms'] - df['server_queue_ms'] - df['server_exec_ms']
-    df['sdk_overhead_ms'] = df['client_duration_ms'] - (df['client_response_ms'] - df['client_request_ms'])
-    df['network_ms'] = df['overhead_ms'] - df['gateway_overhead_ms'] - df['sdk_overhead_ms']
-
-    if row_count < RENDER_LIMIT: # detailed charts
-        df_table = df[['thread_name', 'sql_id', 'job_id', 'is_success',
-                'client_duration_ms', 'server_duration_ms',
-                # 'overhead_ms', 'sdk_overhead_ms', 'gateway_overhead_ms', 'network_ms',
-                'server_queue_ms', 'server_exec_ms']]
-        AgGrid(df_table, height=400,
-            use_container_width=True, columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
-            excel_export_mode=ExcelExportMode.TRIGGER_DOWNLOAD,
-            enable_enterprise_modules=True, update_mode=GridUpdateMode.SELECTION_CHANGED, reload_data=True)
-
-        # align timestamp to x-axis 0
-        df['n_client_start_ms'] = df['client_start_ms'] - df['client_start_ms'].min()
-        df['n_client_end_ms'] = df['client_end_ms'] - df['client_start_ms'].min()
-        df['n_server_submit_ms'] = df['server_submit_ms'] - df['client_start_ms'].min()
-        df['n_server_start_ms'] = df['server_start_ms'] - df['client_start_ms'].min()
-        df['n_server_end_ms'] = df['server_end_ms'] - df['client_start_ms'].min()
-
-        hint = ['sql_id', 'job_id', 'n_client_start_ms', 'n_client_end_ms', 'client_duration_ms',
-                'n_server_submit_ms', 'n_server_start_ms', 'n_server_end_ms', 'server_duration_ms',
-                'server_queue_ms', 'server_exec_ms']
-
-        c_client = alt.Chart().mark_bar().encode(
-            x='n_client_start_ms',
-            x2='n_client_end_ms',
-            y='thread_name',
-            detail=hint,
-            color='sql_id'
-        ).interactive()
-        c_text = alt.Chart().mark_text(align='left', baseline='middle', color='white').encode(
-            x=alt.X('n_client_start_ms'),
-            y=alt.Y('thread_name'),
-            text=alt.Text('client_duration_ms'),
-            detail=hint,
-        ).interactive()
-
-        c = alt.layer(c_client, c_text, data=df)
-        st.altair_chart(c, use_container_width=True)
-
-    else: # charts for massive data
-        df['t'] = pd.to_datetime(df['client_start_ms'], unit=f'ms')
-        step = (df['client_start_ms'].max() - df['client_start_ms'].min()) // 300
-        df_agg = df.groupby([pd.Grouper(key='t', freq=f'{step}ms'), 'sql_id']).agg({'client_duration_ms': ['mean', 'min', 'max']})
-        df_agg.columns = df_agg.columns.map('.'.join)
-        df_agg = df_agg.reset_index()
-        df_agg.rename(columns={'t': 'client_start_time',
-                               'client_duration_ms.mean': 'mean',
-                               'client_duration_ms.min': 'min',
-                               'client_duration_ms.max': 'max'}, inplace=True)
-
-        c = alt.layer(
-            alt.Chart(df_agg).mark_point(filled=False).encode(y=alt.Y('mean'), color='sql_id'),
-            alt.Chart(df_agg).mark_errorbar().encode(y=alt.Y('min', title=None), y2='max', color='sql_id')
-        ).encode(
-            x=alt.X('client_start_time', title=None)
-        ).interactive()
-        st.altair_chart(c, use_container_width=True)
-
-    # profiles
-    st.subheader('Profile')
-    stats = df.groupby('sql_id')['client_duration_ms'].agg(['count', 'min', 'max', 'mean', 'median'])
-    stats['25%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.25)
-    stats['75%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.75)
-    stats['90%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.90)
-    stats['95%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.95)
-    stats['99%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.99)
-    success_rate = df.groupby('sql_id')['is_success'].mean().rename('success_rate')
-    stats = pd.merge(stats, success_rate, on='sql_id').reset_index()
-
-    overall = df['client_duration_ms'].agg(['count', 'min', 'max', 'mean', 'median'])
-    overall['25%'] = df['client_duration_ms'].quantile(0.25)
-    overall['75%'] = df['client_duration_ms'].quantile(0.75)
-    overall['90%'] = df['client_duration_ms'].quantile(0.90)
-    overall['95%'] = df['client_duration_ms'].quantile(0.95)
-    overall['99%'] = df['client_duration_ms'].quantile(0.99)
-    overall['success_rate'] = df['is_success'].mean()
-    overall = pd.DataFrame(overall).T
-    overall['sql_id'] = '-- OVERALL --'
-
-    stats = pd.concat([overall, stats], ignore_index=True)
-    stats['success_rate'] = stats['success_rate'].apply(lambda x: round(x * 100, 2))
-
-    AgGrid(stats[['sql_id', 'count', 'success_rate', 'min', '25%', 'median', 'mean', '75%', '90%', '95%', '99%', 'max']],
-        use_container_width=True, columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
-        excel_export_mode=ExcelExportMode.TRIGGER_DOWNLOAD,
-        enable_enterprise_modules=True, update_mode=GridUpdateMode.SELECTION_CHANGED, reload_data=True)
+csv = None
 
 with col_conf_and_run:
     cols = st.columns([1,2])
@@ -394,12 +295,12 @@ if existing_test:
             st.session_state.pop('pid')
         load_and_display_log(log_file)
         prepare_download_btn(test)
-        analyze(csv_file)
+        csv = csv_file
     else: # test finished
         test_head.info(f'Load existing test: {test}')
         load_and_display_log(log_file)
         prepare_download_btn(test)
-        analyze(csv_file)
+        csv = csv_file
 elif run and 'pid' not in st.session_state:
     conf_path = existing_conf
     sql_paths = existing_sqls
@@ -425,7 +326,7 @@ elif run and 'pid' not in st.session_state:
         output_log = f'{test_folder}/log.txt'
         pid_file = f'{test_folder}/pid'
         cmd = f'java {jvm_param}' + \
-              f' -cp jdbc-stress-tool-1.0-jar-with-dependencies.jar:clickzetta-java-1.0.2-jar-with-dependencies.jar:{jdbc_path}' + \
+              f' -cp jdbc-stress-tool-1.0-jar-with-dependencies.jar:clickzetta-java-1.1.1-jar-with-dependencies.jar:{jdbc_path}' + \
               ' com.clickzetta.jdbc_stress_tool.Main' + \
               f' -c {conf_path}' + \
               f' -q {sql_path}' + \
@@ -453,4 +354,140 @@ elif run and 'pid' not in st.session_state:
             st.session_state.pop('pid')
         load_and_display_log(output_log)
         prepare_download_btn(test)
-        analyze(output_csv)
+        csv = output_csv
+
+df = None
+if csv:
+    st.subheader(f'Report of test {st.session_state.get("test")}')
+    try:
+        df = pd.read_csv(csv)
+    except Exception as ex:
+        st.warning(f'Failed to read {csv}, reason {ex}')
+
+if df is not None:
+    duration = df['client_end_ms'].max() - df['client_start_ms'].min()
+    qps = 1000.0 * len(df) / duration
+    st.code('current sql count {:,} \t time elapsed {:,} ms \t qps {:.3f}'.format(len(df), duration, qps))
+    row_count = len(df)
+    step = duration // 300
+
+    # align timestamp to x-axis 0
+    df['n_client_start_ms'] = df['client_start_ms'] - df['client_start_ms'].min()
+    df['n_client_end_ms'] = df['client_end_ms'] - df['client_start_ms'].min()
+    df['n_server_submit_ms'] = df['server_submit_ms'] - df['client_start_ms'].min()
+    df['n_server_start_ms'] = df['server_start_ms'] - df['client_start_ms'].min()
+    df['n_server_end_ms'] = df['server_end_ms'] - df['client_start_ms'].min()
+
+    df['overhead_ms'] = df['client_duration_ms'] - df['server_duration_ms']
+    df['server_queue_ms'] = df['server_start_ms'] - df['server_submit_ms']
+    df['server_exec_ms'] = df['server_end_ms'] - df['server_start_ms']
+    df['gateway_overhead_ms'] = df['gateway_end_ms'] - df['gateway_start_ms'] - df['server_queue_ms'] - df['server_exec_ms']
+    df['sdk_overhead_ms'] = df['client_duration_ms'] - (df['client_response_ms'] - df['client_request_ms'])
+    df['network_ms'] = df['overhead_ms'] - df['gateway_overhead_ms'] - df['sdk_overhead_ms']
+
+    if row_count >= RENDER_LIMIT:
+        st.warning(f'too many data({row_count} rows), no detailed duration distribution chart')
+    else: # detailed charts
+        df_table = df[['thread_name', 'sql_id', 'job_id', 'is_success',
+                'client_duration_ms', 'server_duration_ms',
+                # 'overhead_ms', 'sdk_overhead_ms', 'gateway_overhead_ms', 'network_ms',
+                'server_queue_ms', 'server_exec_ms']]
+        st.markdown('### Detailed duration distribution')
+        AgGrid(df_table, height=400,
+            use_container_width=True, columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
+            excel_export_mode=ExcelExportMode.TRIGGER_DOWNLOAD,
+            enable_enterprise_modules=True, update_mode=GridUpdateMode.SELECTION_CHANGED, reload_data=True)
+
+        hint = ['sql_id', 'job_id', 'n_client_start_ms', 'n_client_end_ms', 'client_duration_ms',
+                'n_server_submit_ms', 'n_server_start_ms', 'n_server_end_ms', 'server_duration_ms',
+                'server_queue_ms', 'server_exec_ms']
+
+        c_client = alt.Chart().mark_bar().encode(
+            x='n_client_start_ms',
+            x2='n_client_end_ms',
+            y='thread_name',
+            detail=hint,
+            color='sql_id'
+        ).interactive()
+        c_text = alt.Chart().mark_text(align='left', baseline='middle', color='white').encode(
+            x=alt.X('n_client_start_ms'),
+            y=alt.Y('thread_name'),
+            text=alt.Text('client_duration_ms'),
+            detail=hint,
+        ).interactive()
+
+        c = alt.layer(c_client, c_text, data=df)
+        st.altair_chart(c, use_container_width=True)
+
+    # duration(latency) chart
+    cols = st.columns(2)
+    cols[0].markdown('#### Duration(Latency) Chart')
+    # duration_point = cols[1].selectbox('point', ['mean', 'P90', 'P95', 'P99', 'max'])
+
+    df_duration = df[['sql_id', 'n_client_end_ms', 'client_duration_ms']]
+    df_duration['time'] = df_duration['n_client_end_ms'] // step * step
+    df_duration = df_duration.groupby(['time', 'sql_id']).agg(
+        {'client_duration_ms': ['mean', 'min', 'max', percentile(90), percentile(95), percentile(99)]})
+    df_duration.columns = df_duration.columns.map('.'.join)
+    df_duration.rename(columns={
+                            'client_duration_ms.P90': 'P90',
+                            'client_duration_ms.P95': 'P95',
+                            'client_duration_ms.P99': 'P99',
+                            'client_duration_ms.mean': 'mean',
+                            'client_duration_ms.min': 'min',
+                            'client_duration_ms.max': 'max'}, inplace=True)
+    df_duration = df_duration.reset_index()
+    hint = ['time', 'min', 'mean', 'P90', 'P95', 'P99', 'max']
+    c = alt.layer(
+        alt.Chart(df_duration).mark_point(filled=False).encode(y=alt.Y('mean'), color='sql_id', detail=hint),
+        alt.Chart(df_duration).mark_errorbar().encode(y=alt.Y('min', title='duration(ms)'), y2='max', color='sql_id', detail=hint)
+    ).encode(
+        x=alt.X('time', title='time(ms)')
+    ).interactive()
+    st.altair_chart(c, use_container_width=True)
+
+    # qps chart
+    st.markdown('#### QPS Chart')
+    df_qps = df[['n_client_end_ms', 'client_duration_ms']]
+    qps_step = step if step >= 1000 else 1000
+    df_qps['time'] = df_qps['n_client_end_ms'] // qps_step * qps_step / 1000
+    df_qps = df_qps.groupby('time').agg({'client_duration_ms': ['count']})
+    df_qps.columns = df_qps.columns.map('.'.join)
+    df_qps.rename(columns={'client_duration_ms.count': 'count'}, inplace=True)
+    df_qps['qps'] = df_qps['count'] * 1000 / qps_step
+    df_qps = df_qps.reset_index()
+    c = alt.layer(
+        alt.Chart(df_qps).mark_bar().encode(y=alt.Y('qps'))
+    ).encode(
+        x=alt.X('time', title='time(s)')
+    ).interactive()
+    st.altair_chart(c, use_container_width=True)
+
+    # profile dataframe
+    st.markdown('#### SQL Profile Table')
+    stats = df.groupby('sql_id')['client_duration_ms'].agg(['count', 'min', 'max', 'mean', 'median'])
+    stats['25%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.25)
+    stats['75%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.75)
+    stats['90%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.90)
+    stats['95%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.95)
+    stats['99%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.99)
+    success_rate = df.groupby('sql_id')['is_success'].mean().rename('success_rate')
+    stats = pd.merge(stats, success_rate, on='sql_id').reset_index()
+
+    overall = df['client_duration_ms'].agg(['count', 'min', 'max', 'mean', 'median'])
+    overall['25%'] = df['client_duration_ms'].quantile(0.25)
+    overall['75%'] = df['client_duration_ms'].quantile(0.75)
+    overall['90%'] = df['client_duration_ms'].quantile(0.90)
+    overall['95%'] = df['client_duration_ms'].quantile(0.95)
+    overall['99%'] = df['client_duration_ms'].quantile(0.99)
+    overall['success_rate'] = df['is_success'].mean()
+    overall = pd.DataFrame(overall).T
+    overall['sql_id'] = '-- OVERALL --'
+
+    stats = pd.concat([overall, stats], ignore_index=True)
+    stats['success_rate'] = stats['success_rate'].apply(lambda x: round(x * 100, 2))
+
+    AgGrid(stats[['sql_id', 'count', 'success_rate', 'min', '25%', 'median', 'mean', '75%', '90%', '95%', '99%', 'max']],
+        use_container_width=True, columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
+        excel_export_mode=ExcelExportMode.TRIGGER_DOWNLOAD,
+        enable_enterprise_modules=True, update_mode=GridUpdateMode.SELECTION_CHANGED, reload_data=True)
