@@ -1,6 +1,5 @@
 package com.clickzetta.jdbc_stress_tool;
 
-import com.clickzetta.client.ClickZettaClient;
 import org.apache.commons.cli.*;
 import org.apache.commons.lang3.StringUtils;
 
@@ -42,19 +41,13 @@ public class Main {
 
     boolean validate() {
         // ping
-        String host;
-        if (config.jdbcUrl.startsWith("jdbc:clickzetta://")) {
-            ClickZettaClient client = ClickZettaClient.newBuilder()
-                    .url(config.jdbcUrl.substring(5))
-                    .username(config.username)
-                    .password(config.password)
-                    .build();
-            host = client.getService();
-        } else {
-            // eg. jdbc:postgresql://127.0.0.1:5432/robert
-            host = config.jdbcUrl.split("/")[2].split(":")[0];
-        }
         try {
+            // eg. jdbc:postgresql://127.0.0.1:5432/robert
+            String host = config.jdbcUrl.split("/")[2].split(":")[0];
+            if (config.jdbcUrl.startsWith("jdbc:clickzetta://")) {
+                // remove instance part from host
+                host = host.split("\\.", 2)[1];
+            }
             Runtime rt = Runtime.getRuntime();
             Process p = rt.exec("ping -c 10 " + host);
             BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
@@ -64,7 +57,7 @@ public class Main {
             }
             in.close();
         } catch (Throwable e) {
-            System.err.println("failed to ping " + host + ", reason " + e.getMessage());
+            System.err.println("failed to ping database host, reason " + e.getMessage());
         }
         try {
             // validate jdbc connection &  warn up connection pool with init sql
@@ -101,6 +94,7 @@ public class Main {
 
     void run() throws IOException {
         System.out.println("running sqls:");
+        System.out.printf("[%s] begin ...%n", java.time.LocalDateTime.now());
         BufferedWriter output = new BufferedWriter(new FileWriter(config.output));
         output.write(Metric.getHeader());
         output.write("\n");
@@ -150,8 +144,7 @@ public class Main {
         }
         long endTimestamp = System.currentTimeMillis();
         long duration = endTimestamp - startTimestamp;
-
-        System.out.println("done");
+        System.out.printf("[%s] done%n", java.time.LocalDateTime.now());
         System.out.println("summary:");
         System.out.println("elapsed: " + duration + "ms");
         System.out.println("sql    : " + total);
