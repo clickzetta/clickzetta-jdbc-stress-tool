@@ -27,6 +27,9 @@ ADD streamlit/run.sh run.sh
 ADD streamlit/main.py main.py
 ADD streamlit/icon.png icon.png
 
+# benchmarks
+ADD streamlit/benchmark benchmark
+
 ENV VOLUME /mnt/userdata
 VOLUME /mnt/userdata
 
