@@ -84,10 +84,10 @@ def list_folders(folder):
         if f.is_dir():
             ret.append(f.name)
     ret.sort(key=lambda x: os.path.getmtime(f'{folder}/{x}'), reverse=True)
-    return [''] + ret
+    return ret
 
 def list_files(folder, filter=None):
-    ret = ['']
+    ret = []
     files = os.listdir(folder)
     if files:
         files.sort(key=lambda x: os.path.getmtime(f'{folder}/{x}'), reverse=True)
@@ -126,12 +126,17 @@ def percentile(n):
     percentile_.__name__ = 'P{}'.format(n)
     return percentile_
 
+def clear_for_run():
+    if 'select_test' in st.session_state:
+        st.session_state.pop('select_test')
+    if 'test' in st.session_state:
+        st.session_state.pop('test')
+
 csv = None
 
 with col_conf_and_run:
+    st.subheader('1. Define stress: SQLs and concurreny')
     cols = st.columns([1,2])
-    cols[0].subheader('1. Define stress:')
-    cols[1].info('SQLs to run and client concurrency')
     uploaded_sqls = None
     with cols[0].form('upload_sql', clear_on_submit=True):
         sqls = st.file_uploader("Upload new sql file(s)", accept_multiple_files=True)
@@ -143,16 +148,30 @@ with col_conf_and_run:
             else:
                 st.session_state['selected_sqls'] = uploaded
     all_sqls = list_files('sql')
-    select_all_sqls = cols[1].checkbox('Select all', value=False)
-    if select_all_sqls:
-        st.session_state['selected_sqls'] = [s for s in all_sqls if s]
-    existing_sqls = cols[1].multiselect('Choose existing sql files', all_sqls, st.session_state.get('selected_sqls'))
+    tpc_h = list_files('benchmark/tpc-h')
+    ssb_flat = list_files('benchmark/ssb-flat')
+    sql_template = cols[1].selectbox('Select pre-defined benchmark', ['tpc-h', 'ssb-flat', 'all uploaded sql'],
+                                     index=None, placeholder='Pick pre-defined benchmark here')
+    # select_all_sqls = cols[1].checkbox('Select all', value=False)
+    if sql_template == 'tpc-h':
+        st.session_state['selected_sqls'] = tpc_h
+    elif sql_template == 'ssb-flat':
+        st.session_state['selected_sqls'] = ssb_flat
+    if sql_template == 'all uploaded sql':
+        st.session_state['selected_sqls'] = all_sqls
+    selected_count = ''
+    if st.session_state.get('selected_sqls'):
+        selected_count = f'({len(st.session_state.get("selected_sqls"))} files)'
+    existing_sqls = cols[1].multiselect(f'Select sql files {selected_count}',
+                                        [''] + all_sqls + tpc_h + ssb_flat,
+                                        st.session_state.get('selected_sqls'),
+                                        placeholder='Pick SQL files here')
+                                        # format_func=lambda x: f'...{x[-10:]}' if len(x) > 13 else x)
     repeat = cols[1].number_input('Repeat times of SQLs', value=100, min_value=1, step=1)
     thread = cols[1].number_input('JDBC Concurrency', value=20, min_value=1, step=1)
     st.divider()
+    st.subheader('2. Define target: config and driver')
     cols = st.columns([1,2])
-    cols[0].subheader('2. Define target:')
-    cols[1].info('Database and JDBC Driver')
     with cols[0].form('upload_conf', clear_on_submit=True):
         conf = st.file_uploader("Upload new config file")
         submitted = st.form_submit_button("UPLOAD")
@@ -160,10 +179,10 @@ with col_conf_and_run:
             uploaded = save_file(conf, 'conf')
             st.session_state['selected_conf'] = uploaded
     all_confs = list_files('conf')
-    idx = 0
+    idx = None
     if st.session_state.get('selected_conf'):
         idx = all_confs.index(st.session_state.get('selected_conf'))
-    existing_conf = cols[1].selectbox('Choose existing config file', all_confs, idx)
+    existing_conf = cols[1].selectbox('Select config file', all_confs, idx, placeholder='Pick config file here')
     with cols[1].expander('Config file template'):
         with open('config.ini.template') as f:
             conf_template = f.read()
@@ -175,28 +194,33 @@ with col_conf_and_run:
         if submitted and conf is not None:
             uploaded = save_files(jdbc, 'jdbc_jar')
             st.session_state['selected_jar'] = uploaded
-    cols[1].info('No need to upload or specify ClickZetta JDBC Driver')
-    existing_jdbc = cols[1].multiselect('Choose existing jdbc jars', list_files('jdbc_jar'), st.session_state.get('selected_jar'))
+    cols[1].warning('No need to upload or select clickzetta-java')
+    existing_jdbc = cols[1].multiselect('Select JDBC jar files', list_files('jdbc_jar'), st.session_state.get('selected_jar'),
+                                        placeholder='Pick JDBC jar files here')
     st.divider()
-    st.subheader('3. (optional) Define runtime parameters:')
+    st.subheader('3. (optional) Advance parameters:')
     cols = st.columns([1,2])
     jvm_param = cols[0].text_input('JVM parameters', value='-Xmx4g')
     jdk9 = cols[0].checkbox('Java 9+', help='enable this will add "--add-opens=java.base/java.nio=ALL-UNNAMED" to jvm parameters')
+    no_default_jdbc = cols[0].checkbox('Ignore built-in clickzetta-java',
+                                       help='do no include built-in clickzetta-java in classpath, in case you want to test with a version under development')
     job_id_prefix = cols[1].text_input('job id prefix for clickzetta sql (optional)', help='if not specified, job id prefix will be empty')
     failure_rate = cols[1].slider('stop test if failure rate reach', 0, 100, 10, 1, help='test will stop if failure rate of sqls exceeds this value')
     cols = st.columns(4)
     cols[0].subheader('4. Run test')
-    run = cols[2].button('RUN')
+    run = cols[2].button('RUN', on_click=clear_for_run)
     stop = cols[3].button('STOP')
 
 with col_load_and_log:
-    st.subheader('5. Browse existing test or upload data')
+    st.subheader('5. Test log')
     cols = st.columns(2)
     tests = list_folders('data')
-    idx = 0
-    if st.session_state.get('test'):
+    idx = None
+    if st.session_state.get('select_test'):
+        idx = tests.index(st.session_state.get('select_test'))
+    elif st.session_state.get('test'):
         idx = tests.index(st.session_state.get('test'))
-    existing_test = cols[0].selectbox('Browse existing tests', tests, idx)
+    existing_test = cols[0].selectbox('Select test', tests, idx, placeholder='Pick test here', key='select_test')
     with cols[1].form("upload_zip", clear_on_submit=True):
         zip = st.file_uploader("Upload zip file", type=['zip'])
         submitted = st.form_submit_button("UPLOAD")
@@ -206,11 +230,12 @@ with col_load_and_log:
             os.mkdir(f'data/{test}')
             shutil.unpack_archive(zip_file, f'data/{test}')
             st.session_state['test'] = test
-            st.experimental_rerun()
+            st.rerun()
 
     st.divider()
     test_head = st.empty()
-    stdout = st.empty()
+    with st.expander('Show test log', expanded=True):
+        stdout = st.empty()
     st.divider()
     download_head = st.empty()
     download = st.empty()
@@ -220,8 +245,12 @@ def clear_test(_test):
         shutil.rmtree(f'data/{_test}')
     if os.path.exists(f'download/{_test}.zip'):
         os.remove(f'download/{_test}.zip')
-    st.session_state.pop('test')
-    st.session_state.pop('rename_test')
+    if 'test' in st.session_state:
+        st.session_state.pop('test')
+    if 'rename_test' in st.session_state:
+        st.session_state.pop('rename_test')
+    if 'select_test' in st.session_state:
+        st.session_state.pop('select_test')
 
 def prepare_download_btn(_test):
     if os.path.exists(f'download/{_test}'):
@@ -263,7 +292,7 @@ if st.session_state.get('rename_test') and st.session_state.get('test'):
         except:
             pass
     st.session_state['test'] = dest
-    st.experimental_rerun()
+    st.rerun()
 
 if existing_test:
     test = existing_test
@@ -308,7 +337,6 @@ elif run and 'pid' not in st.session_state:
     jdbc_path = ':'.join(existing_jdbc)
     if jdk9:
         jvm_param = f'--add-opens=java.base/java.nio=ALL-UNNAMED {jvm_param}'
-
     if not conf_path:
         stdout.error('please select a config file')
     elif not sql_path:
@@ -317,16 +345,19 @@ elif run and 'pid' not in st.session_state:
         now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         conf = conf_path.split("/")[1].split(".")[0]
         test = f'{now}_{conf}'
-
-        test_head.info(f'run new test : {test}')
         st.session_state['test'] = test
         test_folder = f'data/{test}'
         os.mkdir(test_folder)
         output_csv = f'{test_folder}/data.csv'
         output_log = f'{test_folder}/log.txt'
         pid_file = f'{test_folder}/pid'
+        classpath = [ 'jdbc-stress-tool-1.0-jar-with-dependencies.jar' ]
+        if not no_default_jdbc:
+            classpath.append('clickzetta-java-1.1.1-jar-with-dependencies.jar')
+        if existing_jdbc:
+            classpath += existing_jdbc
         cmd = f'java {jvm_param}' + \
-              f' -cp jdbc-stress-tool-1.0-jar-with-dependencies.jar:clickzetta-java-1.1.1-jar-with-dependencies.jar:{jdbc_path}' + \
+              f' -cp {":".join(classpath)}' + \
               ' com.clickzetta.jdbc_stress_tool.Main' + \
               f' -c {conf_path}' + \
               f' -q {sql_path}' + \
@@ -336,6 +367,7 @@ elif run and 'pid' not in st.session_state:
               f' -o {output_csv}'
         if job_id_prefix != "":
             cmd += f' --prefix {job_id_prefix}'
+        test_head.info(f'run new test : {test}\n\n{cmd}')
         log = open(output_log, 'w')
         process = subprocess.Popen(cmd.split(), stdout=log, stderr=subprocess.STDOUT)
         with open(pid_file, 'w') as f:
@@ -388,11 +420,11 @@ if df is not None:
     if row_count >= RENDER_LIMIT:
         st.warning(f'too many data({row_count} rows), no detailed duration distribution chart')
     else: # detailed charts
-        df_table = df[['thread_name', 'sql_id', 'job_id', 'is_success',
+        df_table = df[['thread_name', 'sql_id', 'job_id', 'is_success', 'result_size',
                 'client_duration_ms', 'server_duration_ms',
                 # 'overhead_ms', 'sdk_overhead_ms', 'gateway_overhead_ms', 'network_ms',
                 'server_queue_ms', 'server_exec_ms']]
-        st.markdown('### Detailed duration distribution')
+        st.markdown('### Duration table')
         AgGrid(df_table, height=400,
             use_container_width=True, columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
             excel_export_mode=ExcelExportMode.TRIGGER_DOWNLOAD,
