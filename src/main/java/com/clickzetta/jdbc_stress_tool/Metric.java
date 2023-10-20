@@ -20,6 +20,9 @@ public class Metric {
   private long clientStartMs;
   @Getter
   @Setter
+  private long clientResultMs;
+  @Getter
+  @Setter
   private long clientEndMs;
   @Getter
   @Setter
@@ -65,7 +68,7 @@ public class Metric {
           "client_start_ms", "client_end_ms", "client_request_ms",
           "client_response_ms","gateway_start_ms","gateway_end_ms",
           "server_submit_ms","server_start_ms","server_plan_ms",
-          "server_dag_ms","server_resource_ms", "server_end_ms"
+          "server_dag_ms","server_resource_ms", "server_end_ms", "client_result_ms"
   }, ',');
 
   public Metric() {
@@ -79,11 +82,11 @@ public class Metric {
   public String toString() {
     long clientDuration = clientEndMs - clientStartMs;
     long serverDuration = serverEndMs - serverStartMs;
-    return String.format("%s,%s,%s,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
+    return String.format("%s,%s,%s,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
             threadName, sqlId, isSuccess, resultSize,
             jobId, clientDuration, serverDuration,
             clientStartMs, clientEndMs, clientRequestMs, clientResponseMs, gatewayStartMs,
             gatewayEndMs, serverSubmitMs,serverStartMs, serverPlanMs, serverDagMs,
-            serverResourceMs, serverEndMs);
+            serverResourceMs, serverEndMs, clientResultMs);
   }
 }

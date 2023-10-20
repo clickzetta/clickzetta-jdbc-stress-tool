@@ -60,7 +60,7 @@ public class Main {
             System.err.println("failed to ping database host, reason " + e.getMessage());
         }
         try {
-            // validate jdbc connection &  warn up connection pool with init sql
+            // validate jdbc connection &  warm up connection pool with init sql
             Metric metric = initSqlRunner.call();
             System.out.println("validate config done, elapsed " + metric.getClientDuration() + "ms");
             System.out.println("warm up connection pool:");

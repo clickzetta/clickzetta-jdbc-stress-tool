@@ -46,10 +46,12 @@ public class SqlRunner implements Callable<Metric> {
             metric.setServerStartMs(startTime);
 
             long resultSize = 0L;
-
+            boolean hasResult;
             for (String q : SqlUtils.splitSql(sql)) {
                 if (StringUtils.isNotEmpty(q.trim())) {
-                    if (statement.execute(q)) {
+                    hasResult = statement.execute(q);
+                    metric.setClientResultMs(System.currentTimeMillis());
+                    if (hasResult) {
                         ResultSet rs = statement.getResultSet();
                         while (rs.next()) {
                             resultSize++;
@@ -84,14 +86,16 @@ public class SqlRunner implements Callable<Metric> {
         }
     }
 
-    public static void warmUpConnection(Connection conn, String sql) throws SQLException {
+    public static void warmUpConnection(Connection conn, String initSqls) throws SQLException {
         Statement statement = conn.createStatement();
-        if (statement.execute(sql)) {
-            ResultSet rs = statement.getResultSet();
-            while(rs.next()) {
-                // pass
+        for (String q : SqlUtils.splitSql(initSqls)) {
+            if (statement.execute(q)) {
+                ResultSet rs = statement.getResultSet();
+                while(rs.next()) {
+                    // pass
+                }
+                rs.close();
             }
-            rs.close();
         }
         statement.close();
     }

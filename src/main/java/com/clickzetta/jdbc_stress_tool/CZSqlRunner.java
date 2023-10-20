@@ -39,6 +39,7 @@ public class CZSqlRunner extends SqlRunner {
             StringBuilder sb = new StringBuilder();
             String seperator = "";
             int submitted = 0;
+            boolean hasResult;
             for (String q : SqlUtils.splitSql(sql)) {
                 if (SqlUtils.isLocal(q)) { // no need to submit, eg. set x=y;
                     czStatement.execute(q);
@@ -47,7 +48,9 @@ public class CZSqlRunner extends SqlRunner {
                     sb.append(seperator).append(jobId);
                     seperator = ":";
                     submitted++;
-                    if (czStatement.execute(q, jobId)) {
+                    hasResult = czStatement.execute(q, jobId);
+                    metric.setClientResultMs(System.currentTimeMillis());
+                    if (hasResult) {
                         ResultSet rs = statement.getResultSet();
                         while (rs.next()) {
                             resultSize++;
