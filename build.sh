@@ -5,8 +5,5 @@ set -e
 # compile jar
 mvn package
 
-# build image
-docker build . -t clickzetta/jdbc-stress-tool:dev
-# to build x64_64 image on osx
-# docker buildx build . --platform linux/amd64 -t clickzetta/jdbc-stress-tool:dev
-
+# build & push image
+docker buildx build . --platform linux/amd64,linux/arm64 --push -t clickzetta/jdbc-stress-tool:dev

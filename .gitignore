@@ -2,6 +2,7 @@
 .idea
 .venv
 target
+.vscode
 streamlit/conf
 streamlit/sql
 streamlit/jdbc_jar
