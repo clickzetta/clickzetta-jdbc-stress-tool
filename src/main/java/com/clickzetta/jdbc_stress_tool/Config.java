@@ -85,12 +85,18 @@ public class Config {
         System.out.println("init sql: " + initSql);
         System.out.println("thread  : " + threadCount);
         System.out.println("sql     : " + sqls.keySet().size());
+        int sqlCount = 0;
         for (String k : sqls.keySet()) {
             String v = sqls.get(k).trim();
-            if (v.length() > 100) {
-                System.out.println("  " + k + ": " + v.substring(0, 96) + " ...");
+            if (v.length() > 80) {
+                System.out.println("  " + k + ": " + v.substring(0, 76) + " ...");
             } else {
                 System.out.println("  " + k + ": " + v);
+            }
+            sqlCount++;
+            if (sqlCount > 100) {
+                System.out.println("  ...");
+                break;
             }
         }
         System.out.println("repeat  : " + repeatCount);
