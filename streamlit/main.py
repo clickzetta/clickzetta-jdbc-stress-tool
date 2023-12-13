@@ -17,6 +17,7 @@ import altair as alt
 from PIL import Image
 
 RENDER_LIMIT = 2000
+CLICKZETTA_DRIVER = 'clickzetta-java-1.2.2.jar'
 
 icon = None
 try:
@@ -143,10 +144,7 @@ with col_conf_and_run:
         submitted = st.form_submit_button("UPLOAD")
         if submitted and sqls is not None:
             uploaded = save_files(sqls, 'sql')
-            if 'selected_sqls' in st.session_state:
-                st.session_state['selected_sqls'].append(uploaded)
-            else:
-                st.session_state['selected_sqls'] = uploaded
+            st.session_state['selected_sqls'] = uploaded
     all_sqls = list_files('sql')
     tpc_h = list_files('benchmark/tpc-h')
     ssb_flat = list_files('benchmark/ssb-flat')
@@ -163,7 +161,7 @@ with col_conf_and_run:
     if st.session_state.get('selected_sqls'):
         selected_count = f'({len(st.session_state.get("selected_sqls"))} files)'
     existing_sqls = cols[1].multiselect(f'Select sql files {selected_count}',
-                                        [''] + all_sqls + tpc_h + ssb_flat,
+                                        all_sqls + tpc_h + ssb_flat,
                                         st.session_state.get('selected_sqls'),
                                         placeholder='Pick SQL files here')
                                         # format_func=lambda x: f'...{x[-10:]}' if len(x) > 13 else x)
@@ -214,13 +212,19 @@ with col_conf_and_run:
 with col_load_and_log:
     st.subheader('5. Test log')
     cols = st.columns(2)
-    tests = list_folders('data')
+    tests = [''] + list_folders('data')
     idx = None
-    if st.session_state.get('select_test'):
-        idx = tests.index(st.session_state.get('select_test'))
-    elif st.session_state.get('test'):
-        idx = tests.index(st.session_state.get('test'))
+    try:
+        if st.session_state.get('select_test'):
+            idx = tests.index(st.session_state.get('select_test'))
+        elif st.session_state.get('rename_test'):
+            idx = tests.index(st.session_state.get('rename_test'))
+        elif st.session_state.get('test'):
+            idx = tests.index(st.session_state.get('test'))
+    except:
+        pass
     existing_test = cols[0].selectbox('Select test', tests, idx, placeholder='Pick test here', key='select_test')
+    duration_col = cols[0].selectbox('select duration type', ['client_duration_ms', 'server_duration_ms'])
     with cols[1].form("upload_zip", clear_on_submit=True):
         zip = st.file_uploader("Upload zip file", type=['zip'])
         submitted = st.form_submit_button("UPLOAD")
@@ -353,7 +357,7 @@ elif run and 'pid' not in st.session_state:
         pid_file = f'{test_folder}/pid'
         classpath = [ 'jdbc-stress-tool-1.0-jar-with-dependencies.jar' ]
         if not no_default_jdbc:
-            classpath.append('clickzetta-java-1.1.1-jar-with-dependencies.jar')
+            classpath.append(CLICKZETTA_DRIVER)
         if existing_jdbc:
             classpath += existing_jdbc
         cmd = f'java {jvm_param}' + \
@@ -367,7 +371,7 @@ elif run and 'pid' not in st.session_state:
               f' -o {output_csv}'
         if job_id_prefix != "":
             cmd += f' --prefix {job_id_prefix}'
-        test_head.info(f'run new test : {test}\n\n{cmd}')
+        test_head.code(f'run new test : {test}\n\n{cmd}')
         log = open(output_log, 'w')
         process = subprocess.Popen(cmd.split(), stdout=log, stderr=subprocess.STDOUT)
         with open(pid_file, 'w') as f:
@@ -452,22 +456,20 @@ if df is not None:
         st.altair_chart(c, use_container_width=True)
 
     # duration(latency) chart
-    cols = st.columns(2)
-    cols[0].markdown('#### Duration(Latency) Chart')
-    # duration_point = cols[1].selectbox('point', ['mean', 'P90', 'P95', 'P99', 'max'])
+    st.markdown(f'#### Duration(Latency) Chart: {duration_col}')
 
-    df_duration = df[['sql_id', 'n_client_end_ms', 'client_duration_ms']]
+    df_duration = df[['sql_id', 'n_client_end_ms', duration_col]]
     df_duration['time'] = df_duration['n_client_end_ms'] // step * step
     df_duration = df_duration.groupby(['time', 'sql_id']).agg(
-        {'client_duration_ms': ['mean', 'min', 'max', percentile(90), percentile(95), percentile(99)]})
+        {duration_col: ['mean', 'min', 'max', percentile(90), percentile(95), percentile(99)]})
     df_duration.columns = df_duration.columns.map('.'.join)
     df_duration.rename(columns={
-                            'client_duration_ms.P90': 'P90',
-                            'client_duration_ms.P95': 'P95',
-                            'client_duration_ms.P99': 'P99',
-                            'client_duration_ms.mean': 'mean',
-                            'client_duration_ms.min': 'min',
-                            'client_duration_ms.max': 'max'}, inplace=True)
+                            f'{duration_col}.P90': 'P90',
+                            f'{duration_col}.P95': 'P95',
+                            f'{duration_col}.P99': 'P99',
+                            f'{duration_col}.mean': 'mean',
+                            f'{duration_col}.min': 'min',
+                            f'{duration_col}.max': 'max'}, inplace=True)
     df_duration = df_duration.reset_index()
     hint = ['time', 'min', 'mean', 'P90', 'P95', 'P99', 'max']
     c = alt.layer(
@@ -489,29 +491,29 @@ if df is not None:
     df_qps['qps'] = df_qps['count'] * 1000 / qps_step
     df_qps = df_qps.reset_index()
     c = alt.layer(
-        alt.Chart(df_qps).mark_bar().encode(y=alt.Y('qps'))
+        alt.Chart(df_qps).mark_line(point=True).encode(y=alt.Y('qps'))
     ).encode(
         x=alt.X('time', title='time(s)')
     ).interactive()
     st.altair_chart(c, use_container_width=True)
 
     # profile dataframe
-    st.markdown('#### SQL Profile Table')
-    stats = df.groupby('sql_id')['client_duration_ms'].agg(['count', 'min', 'max', 'mean', 'median'])
-    stats['25%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.25)
-    stats['75%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.75)
-    stats['90%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.90)
-    stats['95%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.95)
-    stats['99%'] = df.groupby('sql_id')['client_duration_ms'].quantile(0.99)
+    st.markdown(f'#### SQL Profile Table: {duration_col}')
+    stats = df.groupby('sql_id')[duration_col].agg(['count', 'min', 'max', 'mean', 'median'])
+    stats['25%'] = df.groupby('sql_id')[duration_col].quantile(0.25)
+    stats['75%'] = df.groupby('sql_id')[duration_col].quantile(0.75)
+    stats['90%'] = df.groupby('sql_id')[duration_col].quantile(0.90)
+    stats['95%'] = df.groupby('sql_id')[duration_col].quantile(0.95)
+    stats['99%'] = df.groupby('sql_id')[duration_col].quantile(0.99)
     success_rate = df.groupby('sql_id')['is_success'].mean().rename('success_rate')
     stats = pd.merge(stats, success_rate, on='sql_id').reset_index()
 
-    overall = df['client_duration_ms'].agg(['count', 'min', 'max', 'mean', 'median'])
-    overall['25%'] = df['client_duration_ms'].quantile(0.25)
-    overall['75%'] = df['client_duration_ms'].quantile(0.75)
-    overall['90%'] = df['client_duration_ms'].quantile(0.90)
-    overall['95%'] = df['client_duration_ms'].quantile(0.95)
-    overall['99%'] = df['client_duration_ms'].quantile(0.99)
+    overall = df[duration_col].agg(['count', 'min', 'max', 'mean', 'median'])
+    overall['25%'] = df[duration_col].quantile(0.25)
+    overall['75%'] = df[duration_col].quantile(0.75)
+    overall['90%'] = df[duration_col].quantile(0.90)
+    overall['95%'] = df[duration_col].quantile(0.95)
+    overall['99%'] = df[duration_col].quantile(0.99)
     overall['success_rate'] = df['is_success'].mean()
     overall = pd.DataFrame(overall).T
     overall['sql_id'] = '-- OVERALL --'
