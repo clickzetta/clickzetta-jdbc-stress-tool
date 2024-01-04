@@ -15,4 +15,4 @@ then
   wget https://repo1.maven.org/maven2/com/clickzetta/clickzetta-java/1.2.2/clickzetta-java-1.2.2.jar
 fi
 
-streamlit run --browser.gatherUsageStats false --enableCORS false --enableXsrfProtection false main.py
+streamlit run --browser.gatherUsageStats false --server.enableCORS false --server.enableXsrfProtection false main.py
