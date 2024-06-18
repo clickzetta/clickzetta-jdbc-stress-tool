@@ -44,7 +44,7 @@ public class Config {
         username = prop.getProperty("user", prop.getProperty("username"));
         password = prop.getProperty("password");
         initSql = prop.getProperty("init", "select 1;");
-        connectionPoolType = ConnectionPoolType.valueOf(prop.getProperty("poolType", "hikari").toUpperCase());
+        connectionPoolType = ConnectionPoolType.valueOf(prop.getProperty("pool", "hikari").toUpperCase());
         driverClass = prop.getProperty("driver");
         if (prop.getProperty("thread") != null) {
             threadCount = Integer.parseInt(prop.getProperty("thread", "1"));

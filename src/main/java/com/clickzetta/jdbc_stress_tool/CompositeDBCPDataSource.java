@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collections;
 
 public class CompositeDBCPDataSource implements CompositeDataSource {
 
@@ -24,6 +25,7 @@ public class CompositeDBCPDataSource implements CompositeDataSource {
         ds.setMinIdle(config.threadCount);
         ds.setMaxIdle(config.threadCount);
         ds.setMaxWait(10000);
+        ds.setConnectionInitSqls(Collections.singletonList(config.initSql));
     }
 
     public BasicDataSource getDataSource() {

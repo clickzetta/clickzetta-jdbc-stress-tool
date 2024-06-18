@@ -17,7 +17,7 @@ import altair as alt
 from PIL import Image
 
 RENDER_LIMIT = 2000
-CLICKZETTA_DRIVER = 'clickzetta-java-1.2.2.jar'
+CLICKZETTA_DRIVER = 'clickzetta-java-1.4.6.jar'
 
 icon = None
 try:
@@ -204,13 +204,13 @@ with col_conf_and_run:
                                        help='do no include built-in clickzetta-java in classpath, in case you want to test with a version under development')
     job_id_prefix = cols[1].text_input('job id prefix for clickzetta sql (optional)', help='if not specified, job id prefix will be empty')
     failure_rate = cols[1].slider('stop test if failure rate reach', 0, 100, 10, 1, help='test will stop if failure rate of sqls exceeds this value')
-    cols = st.columns(4)
-    cols[0].subheader('4. Run test')
-    run = cols[2].button('RUN', on_click=clear_for_run)
-    stop = cols[3].button('STOP')
 
 with col_load_and_log:
-    st.subheader('5. Test log')
+    st.subheader('4. Run new test or view existing test')
+    cols = st.columns(2)
+    run = cols[0].button('RUN', on_click=clear_for_run)
+    stop = cols[1].button('STOP')
+    st.divider()
     cols = st.columns(2)
     tests = [''] + list_folders('data')
     idx = None

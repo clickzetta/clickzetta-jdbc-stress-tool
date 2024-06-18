@@ -25,6 +25,7 @@ public class CompositeHikariDataSource implements CompositeDataSource {
         hc.setMaximumPoolSize(config.threadCount);
         hc.addDataSourceProperty("cachePrepStmts", "true");
         hc.addDataSourceProperty("prepStmtCacheSize", "100");
+        hc.setConnectionInitSql(config.initSql);
         ds = new HikariDataSource(hc);
     }
 

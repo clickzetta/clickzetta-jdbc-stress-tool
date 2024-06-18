@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collections;
 
 public class CompositeDruidDataSource implements CompositeDataSource {
 
@@ -23,6 +24,7 @@ public class CompositeDruidDataSource implements CompositeDataSource {
         ds.setInitialSize(config.threadCount);
         ds.setMinIdle(config.threadCount);
         ds.setMaxWait(10000);
+        ds.setConnectionInitSqls(Collections.singletonList(config.initSql));
     }
 
     public DruidDataSource getDataSource() {
