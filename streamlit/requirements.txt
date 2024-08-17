@@ -1,6 +1,5 @@
 pandas
 numpy
 streamlit >= 1.27.2
-streamlit-aggrid
 altair
 Pillow

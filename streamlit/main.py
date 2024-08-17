@@ -429,10 +429,7 @@ if df is not None:
                 # 'overhead_ms', 'sdk_overhead_ms', 'gateway_overhead_ms', 'network_ms',
                 'server_queue_ms', 'server_exec_ms']]
         st.markdown('### Duration table')
-        AgGrid(df_table, height=400,
-            use_container_width=True, columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
-            excel_export_mode=ExcelExportMode.TRIGGER_DOWNLOAD,
-            enable_enterprise_modules=True, update_mode=GridUpdateMode.SELECTION_CHANGED, reload_data=True)
+        st.dataframe(df_table, height=400, use_container_width=True, hide_index=True)
 
         hint = ['sql_id', 'job_id', 'n_client_start_ms', 'n_client_end_ms', 'client_duration_ms',
                 'n_server_submit_ms', 'n_server_start_ms', 'n_server_end_ms', 'server_duration_ms',
@@ -521,7 +518,5 @@ if df is not None:
     stats = pd.concat([overall, stats], ignore_index=True)
     stats['success_rate'] = stats['success_rate'].apply(lambda x: round(x * 100, 2))
 
-    AgGrid(stats[['sql_id', 'count', 'success_rate', 'min', '25%', 'median', 'mean', '75%', '90%', '95%', '99%', 'max']],
-        use_container_width=True, columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
-        excel_export_mode=ExcelExportMode.TRIGGER_DOWNLOAD,
-        enable_enterprise_modules=True, update_mode=GridUpdateMode.SELECTION_CHANGED, reload_data=True)
+    st.dataframe(stats[['sql_id', 'count', 'success_rate', 'min', '25%', 'median', 'mean', '75%', '90%', '95%', '99%', 'max']],
+                 use_container_width=True, hide_index=True)
