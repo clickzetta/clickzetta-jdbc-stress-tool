@@ -17,7 +17,7 @@ import altair as alt
 from PIL import Image
 
 RENDER_LIMIT = 2000
-CLICKZETTA_DRIVER = 'clickzetta-java-1.4.6.jar'
+CLICKZETTA_DRIVER = 'clickzetta-java-1.4.16.jar'
 
 icon = None
 try:
