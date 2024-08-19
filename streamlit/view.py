@@ -1,28 +1,11 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
-from PIL import Image
 import os
 import datetime
 import shutil
 import altair as alt
 from pathlib import Path
-
-icon = None
-try:
-    icon = Image.open('icon.png')
-except:
-    pass
-
-st.set_page_config(
-    page_title="JDBC Stress Test Data Viewer",
-    page_icon=icon,
-    layout="wide",
-    initial_sidebar_state="expanded",
-    menu_items = {
-        'About': 'https://github.com/clickzetta/jdbc-stress-tool'
-    }
-)
 
 st.title('JDBC Stress Test Data Viewer')
 RENDER_LIMIT = 2000
@@ -49,14 +32,6 @@ def save_file(file, folder) -> str:
         return f'{folder}/{dest.name}'
     return None
 
-def clear_test(_test):
-    if os.path.exists(f'data/{_test}'):
-        shutil.rmtree(f'data/{_test}')
-    if os.path.exists(f'download/{_test}.zip'):
-        os.remove(f'download/{_test}.zip')
-    clear_value('view_selected_test')
-    # st.rerun()
-
 @st.dialog("Upload zip file")
 def upload_dialog():
     cols = st.columns(2)
@@ -78,9 +53,9 @@ def upload_dialog():
 @st.dialog("Rename test")
 def rename_test(_test):
     st.markdown(f'`{_test}` to new name')
-    _new = st.text_input('New test name', label_visibility='collapsed')
+    _new = st.text_input('New test name', value=_test, label_visibility='collapsed')
     if st.button('OK', use_container_width=True):
-        if _new != _test:
+        if _new and _new != _test:
             try:
                 if os.path.exists(f'data/{_test}/{_test}.log'):
                     os.rename(f'data/{_test}/{_test}.log', f'data/{_test}/log.txt')
@@ -89,6 +64,17 @@ def rename_test(_test):
                 os.rename(f'data/{_test}', f'data/{_new}')
             except:
                 pass
+            st.rerun()
+
+@st.dialog("Delete test")
+def delete_test(_test):
+    st.markdown(f'Are you sure to delete `{_test}`?')
+    if st.button('OK', use_container_width=True):
+        if os.path.exists(f'data/{_test}'):
+            shutil.rmtree(f'data/{_test}')
+        if os.path.exists(f'download/{_test}.zip'):
+            os.remove(f'download/{_test}.zip')
+        clear_value('view_selected_test')
         st.rerun()
 
 def store_value(key):
@@ -102,7 +88,7 @@ def clear_value(key):
         st.session_state.pop(key)
         st.session_state.pop("_"+key)
 
-cols = st.columns([1,4])
+cols = st.columns([1,3])
 with cols[0]:
     if st.button('New data file', use_container_width=True):
         upload_dialog()
@@ -124,13 +110,9 @@ if selected_test:
         os.rename(f'data/{selected_test}/{selected_test}.log', log_file)
     if os.path.exists(f'data/{selected_test}/{selected_test}.csv'):
         os.rename(f'data/{selected_test}/{selected_test}.csv', csv_file)
-    log_title = 'Test log'
-    if os.path.exists(pid_file): # test is still running
-        log_title = f'Test log (still running)'
     with cols[1]:
-
-        header_cols = st.columns([3,1,1,1])
-        header_cols[0].subheader(f'Log of {selected_test}')
+        header_cols = st.columns([4,1,1,1])
+        header_cols[0].subheader(f'Test log of {selected_test}')
         data_file = f'download/{selected_test}.zip'
         if not os.path.exists(data_file):
             shutil.make_archive(f'download/{selected_test}', 'zip', f'data/{selected_test}/', '.')
@@ -139,18 +121,21 @@ if selected_test:
                                            mime='application/zip', use_container_width=True)
         if header_cols[2].button('Rename', use_container_width=True):
             rename_test(selected_test)
-        header_cols[3].button('Delete', on_click=clear_test, args=(selected_test,), use_container_width=True)
+        if header_cols[3].button('Delete', use_container_width=True):
+            delete_test(selected_test)
 
         with st.container(height=500, border=False):
-            with st.expander('Log', expanded=True):
+            log_title = ':blue[Test finished]'
+            if os.path.exists(pid_file): # test is still running
+                log_title = f':red[Test is still running]'
+            with st.expander(log_title, expanded=True):
                 with open(log_file) as f:
                     log = f.read()
                     st.text(log)
 
-
     df = None
     if csv_file:
-        cols = st.columns([4,1])
+        cols = st.columns([4,1], vertical_alignment='bottom')
         cols[0].subheader(f'Report of test {selected_test}')
         duration_col = cols[1].selectbox('select duration type', ['client_duration_ms', 'server_duration_ms'])
         try:
