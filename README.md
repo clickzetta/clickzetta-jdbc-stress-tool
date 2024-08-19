@@ -16,11 +16,13 @@ Screenshot
 
 ### Run in docker
 
+Official docker images could be found at [dockerhub](https://hub.docker.com/r/clickzetta/jdbc-stress-tool)
+
+A sample start command could be as follows:
 ```shell
-docker pull clickzetta/jdbc-stress-tool:dev
 mkdir stress-test
 cd stress-test
-docker run -p 8501:8501 -v .:/mnt/userdata clickzetta/jdbc-stress-tool:dev
+docker run --rm -d --name jdbc-stress-tool -p 8501:8501 -v .:/mnt/userdata clickzetta/jdbc-stress-tool:dev
 ```
 
 Open http://localhost:8501 in your browser.

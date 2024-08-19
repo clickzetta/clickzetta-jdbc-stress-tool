@@ -25,6 +25,8 @@ ADD target/jdbc-stress-tool-1.0-jar-with-dependencies.jar jdbc-stress-tool-1.0-j
 # streamlit webui
 ADD streamlit/run.sh run.sh
 ADD streamlit/main.py main.py
+ADD streamlit/run.py run.py
+ADD streamlit/view.py view.py
 ADD streamlit/icon.png icon.png
 
 # benchmarks
