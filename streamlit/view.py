@@ -54,6 +54,7 @@ def clear_test(_test):
         shutil.rmtree(f'data/{_test}')
     if os.path.exists(f'download/{_test}.zip'):
         os.remove(f'download/{_test}.zip')
+    st.session_state.pop('view_selected_test')
     # st.rerun()
 
 @st.dialog("Upload zip file")
@@ -67,9 +68,11 @@ def upload_dialog():
         if not os.path.exists(dest_path):
             os.mkdir(dest_path)
         uploaded = save_file(staged, dest_path)
-        unzip_path = f'data/{staged.name[:-4]}'
+        test_name = staged.name[:-4]
+        unzip_path = f'data/{test_name}'
         os.mkdir(unzip_path)
         shutil.unpack_archive(uploaded, unzip_path)
+        st.session_state['view_selected_test'] = test_name
         st.rerun()
 
 @st.dialog("Rename test")
@@ -88,6 +91,12 @@ def rename_test(_test):
                 pass
         st.rerun()
 
+def store_value(key):
+    st.session_state[key] = st.session_state["_"+key]
+def load_value(key):
+    if key in st.session_state:
+        st.session_state["_"+key] = st.session_state[key]
+
 cols = st.columns([1,4])
 with cols[0]:
     if st.button('New data file', use_container_width=True):
@@ -95,7 +104,9 @@ with cols[0]:
 
     tests = list_folders('data')
     with st.container(height=500):
-        selected_test = st.radio(f'{len(tests)} tests', [t[0] for t in tests], captions=[t[1] for t in tests])
+        load_value('view_selected_test')
+        selected_test = st.radio(f'{len(tests)} tests', [t[0] for t in tests], captions=[t[1] for t in tests],
+                                 key='_view_selected_test', on_change=store_value, args=["view_selected_test"])
 
 if selected_test:
     pid_file = f'data/{selected_test}/pid'
