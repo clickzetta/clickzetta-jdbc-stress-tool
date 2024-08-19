@@ -54,7 +54,7 @@ def clear_test(_test):
         shutil.rmtree(f'data/{_test}')
     if os.path.exists(f'download/{_test}.zip'):
         os.remove(f'download/{_test}.zip')
-    st.session_state.pop('view_selected_test')
+    clear_value('view_selected_test')
     # st.rerun()
 
 @st.dialog("Upload zip file")
@@ -97,6 +97,11 @@ def load_value(key):
     if key in st.session_state:
         st.session_state["_"+key] = st.session_state[key]
 
+def clear_value(key):
+    if key in st.session_state:
+        st.session_state.pop(key)
+        st.session_state.pop("_"+key)
+
 cols = st.columns([1,4])
 with cols[0]:
     if st.button('New data file', use_container_width=True):
@@ -105,7 +110,10 @@ with cols[0]:
     tests = list_folders('data')
     with st.container(height=500):
         load_value('view_selected_test')
-        selected_test = st.radio(f'{len(tests)} tests', [t[0] for t in tests], captions=[t[1] for t in tests],
+        _tests = [t[0] for t in tests]
+        if 'view_selected_test' in st.session_state and st.session_state['view_selected_test'] not in _tests:
+            clear_value('view_selected_test')
+        selected_test = st.radio(f'{len(tests)} tests', _tests, captions=[t[1] for t in tests],
                                  key='_view_selected_test', on_change=store_value, args=["view_selected_test"])
 
 if selected_test:
