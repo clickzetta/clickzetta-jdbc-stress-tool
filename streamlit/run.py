@@ -23,7 +23,7 @@ col_conf_and_run, col_load_and_log = st.columns(2)
 if 'VOLUME' in os.environ: # for docker
     vol = os.environ['VOLUME']
     for path in ['conf', 'sql', 'jdbc_jar', 'data', 'download']:
-        src = f'{vol}/{path}'
+        src = os.path.join(vol, path)
         if not os.path.exists(src):
             os.mkdir(src)
         if not os.path.exists(path):
@@ -60,9 +60,9 @@ def st_capture(output_func):
 
 def save_file(file, folder) -> str:
     if file:
-        dest = Path(f"{folder}/{file.name}")
+        dest = Path(folder) / file.name
         dest.write_bytes(file.read())
-        return f'{folder}/{dest.name}'
+        return os.path.join(folder, dest.name)
     return None
 
 def save_files(files, folder) -> str:
@@ -138,7 +138,7 @@ def upload_dialog(dest, extra_hint=None, allow_multi_files=False, allow_sub_fold
         else:
             uploaded = save_file(staged, dest_path)
         if dest == 'download':
-            unzip_path = f'data/{staged.name[:-4]}'
+            unzip_path = os.path.join('data', staged.name[:-4])
             os.mkdir(unzip_path)
             shutil.unpack_archive(uploaded, unzip_path)
         st.rerun()
@@ -151,8 +151,8 @@ with col_conf_and_run:
         if st.button('New SQL files', use_container_width=True):
             upload_dialog('sql', allow_multi_files=True, allow_sub_folder=True)
     all_sqls = list_files('sql', recursive=True)
-    tpc_h = list_files('benchmark/tpc-h', recursive=True)
-    ssb_flat = list_files('benchmark/ssb-flat', recursive=True)
+    tpc_h = list_files(os.path.join('benchmark', 'tpc-h'), recursive=True)
+    ssb_flat = list_files(os.path.join('benchmark', 'ssb-flat'), recursive=True)
     load_value('selected_sqls')
     existing_sqls = cols[1].multiselect(f'Select SQL files or folders',
                                         all_sqls + ssb_flat + tpc_h,
@@ -235,7 +235,7 @@ if stop and in_running_state:
     st.toast(msg)
     st.session_state['last_run_test'] = test
     try:
-        pid_file = f'data/{test}/pid'
+        pid_file = os.path.join('data', test, 'pid')
         os.remove(pid_file)
     except:
         pass
@@ -245,9 +245,9 @@ csv = None
 
 if in_running_state: # resume last test
     test = st.session_state['running_test']
-    pid_file = f'data/{test}/pid'
-    log_file = f'data/{test}/log.txt'
-    csv_file = f'data/{test}/data.csv'
+    pid_file = os.path.join('data', test, 'pid')
+    log_file = os.path.join('data', test, 'log.txt')
+    csv_file = os.path.join('data', test, 'data.csv')
     with open(pid_file, 'r') as f:
         pid = int(f.read())
         st.session_state['running_pid'] = pid
@@ -285,14 +285,14 @@ elif run:
         stdout.error('please select sql files')
     else:
         now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        conf = conf_path.split("/")[1].split(".")[0]
+        conf = conf_path.split(os.sep)[1].split(".")[0]
         test = f'{now}_{conf}'
         st.session_state['running_test'] = test
-        test_folder = f'data/{test}'
+        test_folder = os.path.join('data', test)
         os.mkdir(test_folder)
-        output_csv = f'{test_folder}/data.csv'
-        output_log = f'{test_folder}/log.txt'
-        pid_file = f'{test_folder}/pid'
+        output_csv = os.path.join(test_folder, 'data.csv')
+        output_log = os.path.join(test_folder, 'log.txt')
+        pid_file = os.path.join(test_folder, 'pid')
         classpath = [ 'jdbc-stress-tool-1.0-jar-with-dependencies.jar' ]
         if not no_default_jdbc:
             classpath.append(CLICKZETTA_DRIVER)
@@ -336,8 +336,8 @@ elif run:
         csv = output_csv
 elif 'last_run_test' in st.session_state: # display report of last test
     test = st.session_state['last_run_test']
-    log_file = f'data/{test}/log.txt'
-    csv_file = f'data/{test}/data.csv'
+    log_file = os.path.join('data', test, 'log.txt')
+    csv_file = os.path.join('data', test, 'data.csv')
     status.update(label=f'Load last test: {test}', state='complete')
     load_and_display_log(log_file)
     csv = csv_file

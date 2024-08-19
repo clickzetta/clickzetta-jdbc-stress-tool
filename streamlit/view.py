@@ -27,9 +27,9 @@ def list_folders(folder):
 
 def save_file(file, folder) -> str:
     if file:
-        dest = Path(f"{folder}/{file.name}")
+        dest = Path(folder) / file.name
         dest.write_bytes(file.read())
-        return f'{folder}/{dest.name}'
+        return os.path.join(folder, dest.name)
     return None
 
 @st.dialog("Upload zip file")
@@ -44,7 +44,7 @@ def upload_dialog():
             os.mkdir(dest_path)
         uploaded = save_file(staged, dest_path)
         test_name = staged.name[:-4]
-        unzip_path = f'data/{test_name}'
+        unzip_path = os.path.join('data', test_name)
         os.mkdir(unzip_path)
         shutil.unpack_archive(uploaded, unzip_path)
         st.session_state['view_selected_test'] = test_name
@@ -57,11 +57,13 @@ def rename_test(_test):
     if st.button('OK', use_container_width=True):
         if _new and _new != _test:
             try:
-                if os.path.exists(f'data/{_test}/{_test}.log'):
-                    os.rename(f'data/{_test}/{_test}.log', f'data/{_test}/log.txt')
-                if os.path.exists(f'data/{_test}/{_test}.csv'):
-                    os.rename(f'data/{_test}/{_test}.csv', f'data/{_test}/data.csv')
-                os.rename(f'data/{_test}', f'data/{_new}')
+                p = os.path.join('data', _test, f'{_test}.log')
+                if os.path.exists(p):
+                    os.rename(p, os.path.join('data', _test, 'log.txt'))
+                p = os.path.join('data', _test, f'{_test}.csv')
+                if os.path.exists(p):
+                    os.rename(p, os.path.join('data', _test, 'data.csv'))
+                os.rename(os.path.join('data', _test), os.path.join('data', _new))
             except:
                 pass
             st.rerun()
@@ -70,10 +72,12 @@ def rename_test(_test):
 def delete_test(_test):
     st.markdown(f'Are you sure to delete `{_test}`?')
     if st.button('OK', use_container_width=True):
-        if os.path.exists(f'data/{_test}'):
-            shutil.rmtree(f'data/{_test}')
-        if os.path.exists(f'download/{_test}.zip'):
-            os.remove(f'download/{_test}.zip')
+        p = os.path.join('data', _test)
+        if os.path.exists(p):
+            shutil.rmtree(p)
+        p = os.path.join('download', f'{_test}.zip')
+        if os.path.exists(p):
+            os.remove(p)
         clear_value('view_selected_test')
         st.rerun()
 
@@ -103,19 +107,21 @@ with cols[0]:
                                  key='_view_selected_test', on_change=store_value, args=["view_selected_test"])
 
 if selected_test:
-    pid_file = f'data/{selected_test}/pid'
-    log_file = f'data/{selected_test}/log.txt'
-    csv_file = f'data/{selected_test}/data.csv'
-    if os.path.exists(f'data/{selected_test}/{selected_test}.log'):
-        os.rename(f'data/{selected_test}/{selected_test}.log', log_file)
-    if os.path.exists(f'data/{selected_test}/{selected_test}.csv'):
-        os.rename(f'data/{selected_test}/{selected_test}.csv', csv_file)
+    pid_file = os.path.join('data', selected_test, 'pid')
+    log_file = os.path.join('data', selected_test, 'log.txt')
+    csv_file = os.path.join('data', selected_test, 'data.csv')
+    p = os.path.join('data', selected_test, f'{selected_test}.log')
+    if os.path.exists(p):
+        os.rename(p, log_file)
+    p = os.path.join('data', selected_test, f'{selected_test}.csv')
+    if os.path.exists(p):
+        os.rename(p, csv_file)
     with cols[1]:
         header_cols = st.columns([4,1,1,1])
         header_cols[0].subheader(f'Test log of {selected_test}')
-        data_file = f'download/{selected_test}.zip'
+        data_file = os.path.join('download', f'{selected_test}.zip')
         if not os.path.exists(data_file):
-            shutil.make_archive(f'download/{selected_test}', 'zip', f'data/{selected_test}/', '.')
+            shutil.make_archive(os.path.join('download', selected_test), 'zip', os.path.join('data', selected_test), '.')
         with open(data_file, 'rb') as f:
             header_cols[1].download_button('Download', f, file_name=f'{selected_test}.zip',
                                            mime='application/zip', use_container_width=True)
