@@ -1,5 +1,5 @@
 pandas
 numpy
-streamlit >= 1.27.2
+streamlit >= 1.37.0
 altair
 Pillow

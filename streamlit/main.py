@@ -12,7 +12,6 @@ from threading import Thread
 from contextlib import contextmanager, redirect_stdout
 import streamlit as st
 from streamlit.runtime.scriptrunner import add_script_run_ctx
-from st_aggrid import AgGrid, ColumnsAutoSizeMode, GridUpdateMode, GridOptionsBuilder, ExcelExportMode
 import altair as alt
 from PIL import Image
 
@@ -26,7 +25,7 @@ except:
     pass
 
 st.set_page_config(
-    page_title="ClickZetta Lakehouse JDBC Stress Test",
+    page_title="JDBC Stress Test Runner",
     page_icon=icon,
     layout="wide",
     initial_sidebar_state="expanded",
@@ -35,7 +34,7 @@ st.set_page_config(
     }
 )
 
-st.title('ClickZetta Lakehouse JDBC Stress Tool')
+st.title('JDBC Stress Tool Runner')
 col_conf_and_run, col_load_and_log = st.columns(2)
 
 if 'VOLUME' in os.environ: # for docker
@@ -134,23 +133,46 @@ def clear_for_run():
         st.session_state.pop('test')
 
 csv = None
+@st.dialog("Upload file")
+def upload_dialog(dest, session_key, extra_hint=None, allow_multi_files=False, allow_sub_folder=False, allowed_file_types=None):
+    if extra_hint:
+        st.warning(extra_hint)
+    cols = st.columns(2)
+    cols[0].markdown(f'To folder `{dest}/`')
+    if allow_sub_folder:
+        sub_folder = cols[1].text_input('Sub folder', label_visibility='collapsed', placeholder='sub folder if needed')
+    staged = st.file_uploader(f'To folder {dest}', accept_multiple_files=allow_multi_files,
+                              label_visibility='collapsed', type=allowed_file_types)
+    if st.button('OK', use_container_width=True):
+        dest_path = dest
+        if allow_sub_folder and sub_folder:
+            dest_path = os.path.join(dest, sub_folder)
+        if not os.path.exists(dest_path):
+            os.mkdir(dest_path)
+        if allow_multi_files:
+            uploaded = save_files(staged, dest_path)
+        else:
+            uploaded = save_file(staged, dest_path)
+        if dest == 'download':
+            unzip_path = f'data/{staged.name[:-4]}'
+            os.mkdir(unzip_path)
+            shutil.unpack_archive(uploaded, unzip_path)
+        if session_key:
+            st.session_state[session_key] = uploaded
+        st.rerun()
 
 with col_conf_and_run:
     st.subheader('1. Define stress: SQLs and concurreny')
-    cols = st.columns([1,2])
     uploaded_sqls = None
-    with cols[0].form('upload_sql', clear_on_submit=True):
-        sqls = st.file_uploader("Upload new sql file(s)", accept_multiple_files=True)
-        submitted = st.form_submit_button("UPLOAD")
-        if submitted and sqls is not None:
-            uploaded = save_files(sqls, 'sql')
-            st.session_state['selected_sqls'] = uploaded
+    cols = st.columns([1,3])
+    with cols[0]:
+        if st.button('New sql files', use_container_width=True):
+            upload_dialog('sql', 'selected_sqls', allow_multi_files=True, allow_sub_folder=True)
     all_sqls = list_files('sql')
     tpc_h = list_files('benchmark/tpc-h')
     ssb_flat = list_files('benchmark/ssb-flat')
     sql_template = cols[1].selectbox('Select pre-defined benchmark', ['tpc-h', 'ssb-flat', 'all uploaded sql'],
-                                     index=None, placeholder='Pick pre-defined benchmark here')
-    # select_all_sqls = cols[1].checkbox('Select all', value=False)
+                                     index=None, placeholder='Pick pre-defined benchmark here', label_visibility='collapsed')
     if sql_template == 'tpc-h':
         st.session_state['selected_sqls'] = tpc_h
     elif sql_template == 'ssb-flat':
@@ -160,44 +182,40 @@ with col_conf_and_run:
     selected_count = ''
     if st.session_state.get('selected_sqls'):
         selected_count = f'({len(st.session_state.get("selected_sqls"))} files)'
-    existing_sqls = cols[1].multiselect(f'Select sql files {selected_count}',
+    existing_sqls = st.multiselect(f'Select sql files {selected_count}',
                                         all_sqls + tpc_h + ssb_flat,
                                         st.session_state.get('selected_sqls'),
                                         placeholder='Pick SQL files here')
                                         # format_func=lambda x: f'...{x[-10:]}' if len(x) > 13 else x)
-    repeat = cols[1].number_input('Repeat times of SQLs', value=100, min_value=1, step=1)
+    cols = st.columns(2)
+    repeat = cols[0].number_input('Repeat times of SQLs', value=100, min_value=1, step=1)
     thread = cols[1].number_input('JDBC Concurrency', value=20, min_value=1, step=1)
     st.divider()
     st.subheader('2. Define target: config and driver')
-    cols = st.columns([1,2])
-    with cols[0].form('upload_conf', clear_on_submit=True):
-        conf = st.file_uploader("Upload new config file")
-        submitted = st.form_submit_button("UPLOAD")
-        if submitted and conf is not None:
-            uploaded = save_file(conf, 'conf')
-            st.session_state['selected_conf'] = uploaded
+    cols = st.columns([1,3])
+    with cols[0]:
+        if st.button('New conf files', use_container_width=True):
+            upload_dialog('conf', 'selected_conf')
     all_confs = list_files('conf')
     idx = None
     if st.session_state.get('selected_conf'):
         idx = all_confs.index(st.session_state.get('selected_conf'))
-    existing_conf = cols[1].selectbox('Select config file', all_confs, idx, placeholder='Pick config file here')
-    with cols[1].expander('Config file template'):
+    existing_conf = cols[1].selectbox('Select config file', all_confs, idx,
+                                      placeholder='Pick config file here', label_visibility='collapsed')
+    with st.expander('Config file template'):
         with open('config.ini.template') as f:
             conf_template = f.read()
         st.code(conf_template, language='ini')
-    cols = st.columns([1,2])
-    with cols[0].form('upload_jdbc', clear_on_submit=True):
-        jdbc = st.file_uploader('Upload new JDBC Jar', type=['jar', 'zip'], accept_multiple_files=True)
-        submitted = st.form_submit_button("UPLOAD")
-        if submitted and conf is not None:
-            uploaded = save_files(jdbc, 'jdbc_jar')
-            st.session_state['selected_jar'] = uploaded
-    cols[1].warning('No need to upload or select clickzetta-java')
+    cols = st.columns([1,3])
+    with cols[0]:
+        if st.button('New JDBC driver', use_container_width=True):
+            upload_dialog('jdbc_jar', 'selected_jar', allowed_file_types=['jar'],
+                          extra_hint='Upload Clickzetta JDBC only if built-in version is not satisfied')
     existing_jdbc = cols[1].multiselect('Select JDBC jar files', list_files('jdbc_jar'), st.session_state.get('selected_jar'),
-                                        placeholder='Pick JDBC jar files here')
+                                        placeholder='Pick JDBC jar files here', label_visibility='collapsed')
     st.divider()
     st.subheader('3. (optional) Advance parameters:')
-    cols = st.columns([1,2])
+    cols = st.columns(2)
     jvm_param = cols[0].text_input('JVM parameters', value='-Xmx4g')
     jdk9 = cols[0].checkbox('Java 9+', help='enable this will add "--add-opens=java.base/java.nio=ALL-UNNAMED" to jvm parameters')
     no_default_jdbc = cols[0].checkbox('Ignore built-in clickzetta-java',
@@ -207,11 +225,11 @@ with col_conf_and_run:
 
 with col_load_and_log:
     st.subheader('4. Run new test or view existing test')
-    cols = st.columns(2)
-    run = cols[0].button('RUN', on_click=clear_for_run)
-    stop = cols[1].button('STOP')
-    st.divider()
-    cols = st.columns(2)
+    cols = st.columns([1,1,1,3])
+    run = cols[0].button('RUN', on_click=clear_for_run, use_container_width=True)
+    stop = cols[1].button('STOP', use_container_width=True)
+    # st.divider()
+    # cols = st.columns(2)
     tests = [''] + list_folders('data')
     idx = None
     try:
@@ -223,22 +241,20 @@ with col_load_and_log:
             idx = tests.index(st.session_state.get('test'))
     except:
         pass
-    existing_test = cols[0].selectbox('Select test', tests, idx, placeholder='Pick test here', key='select_test')
-    duration_col = cols[0].selectbox('select duration type', ['client_duration_ms', 'server_duration_ms'])
-    with cols[1].form("upload_zip", clear_on_submit=True):
-        zip = st.file_uploader("Upload zip file", type=['zip'])
-        submitted = st.form_submit_button("UPLOAD")
-        if submitted and zip is not None:
-            test = zip.name[:-4]
-            zip_file = save_file(zip, 'download')
-            os.mkdir(f'data/{test}')
-            shutil.unpack_archive(zip_file, f'data/{test}')
-            st.session_state['test'] = test
-            st.rerun()
+    existing_test = cols[3].selectbox('Select test', tests, idx, placeholder='Select existing test data',
+                                      key='select_test', label_visibility='collapsed')
+    with cols[2]:
+        if st.button('New data file', use_container_width=True):
+            if existing_test:
+                st.toast('please clear existing test first')
+            else:
+                upload_dialog('download', 'test', allowed_file_types=['zip'],
+                              extra_hint='zip file will be uncompressed to folder data/')
+    duration_col = st.selectbox('select duration type', ['client_duration_ms', 'server_duration_ms'])
 
     st.divider()
-    test_head = st.empty()
-    with st.expander('Show test log', expanded=True):
+    status = st.status('Running log')
+    with status:
         stdout = st.empty()
     st.divider()
     download_head = st.empty()
@@ -266,13 +282,13 @@ def prepare_download_btn(_test):
     if not os.path.exists(data_file):
         shutil.make_archive(f'download/{_test}', 'zip', f'data/{_test}/', '.')
     with open(data_file, 'rb') as f:
-        cols[1].download_button('Download data as zip', f, f'{_test}.zip', 'application/zip')
-    cols[2].button('Drop this test', on_click=clear_test, args=(_test,))
+        cols[1].download_button('Download data as zip', f, f'{_test}.zip', 'application/zip', use_container_width=True)
+    cols[2].button('Drop this test', on_click=clear_test, args=(_test,), use_container_width=True)
 
 if stop and 'pid' in st.session_state and 'test' in st.session_state:
     test = st.session_state['test']
     pid = st.session_state.pop('pid')
-    test_head.error(f'stop test {test}, pid {pid}')
+    status.update(label=f'stop test {test}, pid {pid}', state='error')
     print(f'stop test {test}, pid {pid}')
     os.kill(pid, signal.SIGTERM)
     try:
@@ -291,7 +307,7 @@ if st.session_state.get('rename_test') and st.session_state.get('test'):
             if os.path.exists(f'data/{src}/{src}.csv'):
                 os.rename(f'data/{src}/{src}.csv', f'data/{src}/data.csv')
             os.rename(f'data/{src}', f'data/{dest}')
-            test_head.info(f'renamed test "{src}" to "{dest}"')
+            status.update(label=f'renamed test "{src}" to "{dest}"', state='complete')
             st.session_state.pop('rename_test')
         except:
             pass
@@ -312,7 +328,7 @@ if existing_test:
         with open(pid_file, 'r') as f:
             pid = int(f.read())
             st.session_state['pid'] = pid
-        test_head.info(f'Test is still running: {test}')
+        status.update(label=f'Continue running: {test}', status='running')
         thread = Thread(target=monitor_and_display_log, args=(log_file,))
         add_script_run_ctx(thread)
         thread.start()
@@ -320,6 +336,7 @@ if existing_test:
             os.waitpid(pid, 0)
         except:
             pass
+        status.update(label=f'Finished test {test}', state='complete')
         try:
             os.remove(pid_file)
         except:
@@ -330,11 +347,17 @@ if existing_test:
         prepare_download_btn(test)
         csv = csv_file
     else: # test finished
-        test_head.info(f'Load existing test: {test}')
+        status.update(label=f'Load existing test: {test}', state='complete')
         load_and_display_log(log_file)
         prepare_download_btn(test)
         csv = csv_file
-elif run and 'pid' not in st.session_state:
+elif run:
+    if 'pid' in st.session_state:
+        if 'test' in st.session_state:
+            st.toast(f'Running test detected: {st.session_state["test"]}')
+        else:
+            st.toast(f'Running test detected, pid = {st.session_state["pid"]}')
+        st.stop()
     conf_path = existing_conf
     sql_paths = existing_sqls
     sql_path = ','.join([p for p in sql_paths if p])
@@ -371,7 +394,7 @@ elif run and 'pid' not in st.session_state:
               f' -o {output_csv}'
         if job_id_prefix != "":
             cmd += f' --prefix {job_id_prefix}'
-        test_head.code(f'run new test : {test}\n\n{cmd}')
+        status.update(label=f'Runing: {test}\n\n{cmd}', state='running')
         log = open(output_log, 'w')
         process = subprocess.Popen(cmd.split(), stdout=log, stderr=subprocess.STDOUT)
         with open(pid_file, 'w') as f:
@@ -382,6 +405,7 @@ elif run and 'pid' not in st.session_state:
         thread.start()
         process.wait()
         log.close()
+        status.update(label=f'Finished: {test}\n\n{cmd}', state='complete')
         try:
             os.remove(pid_file)
         except:
