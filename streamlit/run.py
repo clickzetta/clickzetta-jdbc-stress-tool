@@ -157,7 +157,8 @@ with col_conf_and_run:
     existing_sqls = cols[1].multiselect(f'Select SQL files or folders',
                                         all_sqls + ssb_flat + tpc_h,
                                         key='_selected_sqls', on_change=store_value, args=['selected_sqls'],
-                                        placeholder='Pick SQL files here')
+                                        placeholder='Pick SQL files here',
+                                        help='Select a folder means all files and folders recursively in it')
     cols = st.columns(2)
     load_value('sql_repeat_time')
     repeat = cols[0].number_input('Repeat times of SQLs', value=100, min_value=1, step=1,
