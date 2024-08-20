@@ -117,30 +117,43 @@ def percentile(n):
     percentile_.__name__ = 'P{}'.format(n)
     return percentile_
 
-@st.dialog("Upload file")
-def upload_dialog(dest, extra_hint=None, allow_multi_files=False, allow_sub_folder=False, allowed_file_types=None):
-    if extra_hint:
-        st.warning(extra_hint)
+@st.dialog("Upload SQL files")
+def upload_sql_dialog():
+    dest = 'sql'
     cols = st.columns(2)
     cols[0].markdown(f'To folder `{dest}/`')
-    if allow_sub_folder:
-        sub_folder = cols[1].text_input('Sub folder', label_visibility='collapsed', placeholder='sub folder if needed')
-    staged = st.file_uploader(f'To folder {dest}', accept_multiple_files=allow_multi_files,
-                              label_visibility='collapsed', type=allowed_file_types)
+    sub_folder = cols[1].text_input('Sub folder', label_visibility='collapsed', placeholder='sub folder if needed')
+    staged = st.file_uploader(f'To folder {dest}', accept_multiple_files=True, label_visibility='collapsed')
     if st.button('OK', use_container_width=True):
         dest_path = dest
-        if allow_sub_folder and sub_folder:
+        if sub_folder:
             dest_path = os.path.join(dest, sub_folder)
         if not os.path.exists(dest_path):
             os.mkdir(dest_path)
-        if allow_multi_files:
-            uploaded = save_files(staged, dest_path)
-        else:
-            uploaded = save_file(staged, dest_path)
-        if dest == 'download':
-            unzip_path = os.path.join('data', staged.name[:-4])
-            os.mkdir(unzip_path)
-            shutil.unpack_archive(uploaded, unzip_path)
+        save_files(staged, dest_path)
+        st.rerun()
+
+@st.dialog("Upload conf file")
+def upload_conf_dialog():
+    dest = 'conf'
+    st.markdown(f'To folder `{dest}/`')
+    staged = st.file_uploader(f'To folder {dest}', accept_multiple_files=False, label_visibility='collapsed')
+    if st.button('OK', use_container_width=True):
+        if not os.path.exists(dest):
+            os.mkdir(dest)
+        uploaded = save_file(staged, dest)
+        st.rerun()
+
+@st.dialog("Upload jar file")
+def upload_jar_dialog():
+    dest = 'jdbc_jar'
+    st.markdown(f'To folder `{dest}/`')
+    st.warning('Upload Clickzetta JDBC only if built-in version is not satisfied')
+    staged = st.file_uploader(f'To folder {dest}', accept_multiple_files=False, label_visibility='collapsed')
+    if st.button('OK', use_container_width=True):
+        if not os.path.exists(dest):
+            os.mkdir(dest)
+        save_file(staged, dest)
         st.rerun()
 
 with col_conf_and_run:
@@ -149,7 +162,7 @@ with col_conf_and_run:
     cols = st.columns([1,3], vertical_alignment='bottom')
     with cols[0]:
         if st.button('New SQL files', use_container_width=True):
-            upload_dialog('sql', allow_multi_files=True, allow_sub_folder=True)
+            upload_sql_dialog()
     all_sqls = list_files('sql', recursive=True)
     tpc_h = list_files(os.path.join('benchmark', 'tpc-h'), recursive=True)
     ssb_flat = list_files(os.path.join('benchmark', 'ssb-flat'), recursive=True)
@@ -170,7 +183,7 @@ with col_conf_and_run:
     cols = st.columns([1,3])
     with cols[0]:
         if st.button('New conf files', use_container_width=True):
-            upload_dialog('conf')
+            upload_conf_dialog()
     all_confs = list_files('conf')
     load_value('selected_conf')
     existing_conf = cols[1].selectbox('Select config file', all_confs, index=None,
@@ -183,8 +196,7 @@ with col_conf_and_run:
     cols = st.columns([1,3])
     with cols[0]:
         if st.button('New JDBC driver', use_container_width=True):
-            upload_dialog('jdbc_jar', allowed_file_types=['jar'],
-                          extra_hint='Upload Clickzetta JDBC only if built-in version is not satisfied')
+            upload_jar_dialog()
     load_value('selected_jar')
     existing_jdbc = cols[1].multiselect('Select JDBC jar files', list_files('jdbc_jar'),
                                         key='_selected_jar', on_change=store_value, args=['selected_jar'],

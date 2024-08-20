@@ -33,9 +33,8 @@ def save_file(file, folder) -> str:
     return None
 
 @st.dialog("Upload zip file")
-def upload_dialog():
-    cols = st.columns(2)
-    cols[0].markdown(f'to `download/`, and unzipped to `data/`')
+def upload_zip_dialog():
+    st.markdown(f'to `download/`, and unzipped to `data/`')
     staged = st.file_uploader(f'To folder download',
                               label_visibility='collapsed', type=['zip'])
     if st.button('OK', use_container_width=True):
@@ -95,7 +94,7 @@ def clear_value(key):
 cols = st.columns([1,3])
 with cols[0]:
     if st.button('New data file', use_container_width=True):
-        upload_dialog()
+        upload_zip_dialog()
 
     tests = list_folders('data')
     with st.container(height=500):
