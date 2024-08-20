@@ -22,7 +22,7 @@ A sample start command could be as follows:
 ```shell
 mkdir stress-test
 cd stress-test
-docker run --rm -d --name jdbc-stress-tool -p 8501:8501 -v .:/mnt/userdata clickzetta/jdbc-stress-tool:dev
+docker run --rm -d --name jdbc-stress-tool -e TZ='Asia/Singapore' -p 8501:8501 -v .:/mnt/userdata clickzetta/jdbc-stress-tool:dev
 ```
 
 Open http://localhost:8501 in your browser.
