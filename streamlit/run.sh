@@ -10,9 +10,10 @@ then
   ln -s ../target/jdbc-stress-tool-1.0-jar-with-dependencies.jar
 fi
 
-if [ ! -f clickzetta-java-1.4.16.jar ]
+CLICKZETTA_DRIVER=clickzetta-jdbc-3.0.3.jar
+if [ ! -f $CLICKZETTA_DRIVER ]
 then
-  wget https://repo1.maven.org/maven2/com/clickzetta/clickzetta-java/1.4.16/clickzetta-java-1.4.16.jar
+  wget https://repo1.maven.org/maven2/com/clickzetta/clickzetta-jdbc/3.0.3/$CLICKZETTA_DRIVER
 fi
 
-streamlit run --browser.gatherUsageStats false --server.enableCORS false --server.enableXsrfProtection false main.py
+streamlit run --server.address=0.0.0.0 --browser.gatherUsageStats false --server.enableCORS false --server.enableXsrfProtection false main.py

@@ -19,7 +19,7 @@ RUN pip install -i https://mirrors.cloud.tencent.com/pypi/simple -r requirements
 
 # jdbc-stress-tool
 ADD config.ini.template config.ini.template
-RUN wget https://repo1.maven.org/maven2/com/clickzetta/clickzetta-java/1.4.16/clickzetta-java-1.4.16.jar
+RUN wget https://repo1.maven.org/maven2/com/clickzetta/clickzetta-jdbc/3.0.3/clickzetta-jdbc-3.0.3.jar
 ADD target/jdbc-stress-tool-1.0-jar-with-dependencies.jar jdbc-stress-tool-1.0-jar-with-dependencies.jar
 
 # streamlit webui

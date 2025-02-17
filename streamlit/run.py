@@ -6,16 +6,27 @@ import numpy as np
 from pathlib import Path
 import signal
 import time
-import shutil
 from io import StringIO
 from threading import Thread
 from contextlib import contextmanager, redirect_stdout
 import streamlit as st
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 import altair as alt
+import glob
 
 RENDER_LIMIT = 2000
-CLICKZETTA_DRIVER = 'clickzetta-java-1.4.16.jar'
+
+def find_latest_file(pattern):
+    files = glob.glob(pattern)
+    if not files:
+        return None
+
+    latest_file = max(files, key=os.path.getmtime)
+    return latest_file
+
+CLICKZETTA_DRIVER = os.environ.get('CLICKZETTA_DRIVER') or \
+    find_latest_file('clickzetta-jdbc-*.jar') or \
+    find_latest_file('clickzetta-java-*.jar')
 
 st.title('JDBC Stress Test Runner')
 col_conf_and_run, col_load_and_log = st.columns(2)
