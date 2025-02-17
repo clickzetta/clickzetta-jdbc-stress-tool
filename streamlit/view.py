@@ -119,8 +119,7 @@ if selected_test:
         header_cols = st.columns([4,1,1,1])
         header_cols[0].subheader(f'Test log of {selected_test}')
         data_file = os.path.join('download', f'{selected_test}.zip')
-        if not os.path.exists(data_file):
-            shutil.make_archive(os.path.join('download', selected_test), 'zip', os.path.join('data', selected_test), '.')
+        shutil.make_archive(os.path.join('download', selected_test), 'zip', os.path.join('data', selected_test), '.')
         with open(data_file, 'rb') as f:
             header_cols[1].download_button('Download', f, file_name=f'{selected_test}.zip',
                                            mime='application/zip', use_container_width=True)
