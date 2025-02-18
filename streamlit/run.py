@@ -13,6 +13,7 @@ import streamlit as st
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 import altair as alt
 import glob
+from zipfile import ZipFile, is_zipfile
 
 RENDER_LIMIT = 2000
 
@@ -69,20 +70,20 @@ def st_capture(output_func):
         stdout.write = new_write
         yield
 
-def save_file(file, folder) -> str:
+def save_file(file, folder):
     if file:
         dest = Path(folder) / file.name
         dest.write_bytes(file.read())
-        return os.path.join(folder, dest.name)
-    return None
+        if is_zipfile(dest):
+            st.toast(f'Extracting {dest} to {folder}')
+            with ZipFile(dest, 'r') as zip:
+                zip.extractall(folder)
+            dest.unlink()
 
-def save_files(files, folder) -> str:
+def save_files(files, folder):
     if files:
-        dests = []
         for f in files:
-            dests.append(save_file(f, folder))
-        return dests
-    return None
+            save_file(f, folder)
 
 def list_files(folder, recursive=False):
     ret = []
@@ -152,7 +153,7 @@ def upload_conf_dialog():
     if st.button('OK', use_container_width=True):
         if not os.path.exists(dest):
             os.mkdir(dest)
-        uploaded = save_file(staged, dest)
+        save_file(staged, dest)
         st.rerun()
 
 @st.dialog("Upload jar file")
