@@ -56,6 +56,24 @@ public class Metric {
   private long serverEndMs;
   @Getter
   @Setter
+  private long preCheckStartMs;
+  @Getter
+  @Setter
+  private long preCheckEndMs;
+  @Getter
+  @Setter
+  private long sqlStartRunMs;
+  @Getter
+  @Setter
+  private long planCreatedMs;
+  @Getter
+  @Setter
+  private long gotResourcedMs;
+  @Getter
+  @Setter
+  private long dagCompletedMs;
+  @Getter
+  @Setter
   private boolean isSuccess = false;
   @Getter
   @Setter
@@ -68,7 +86,9 @@ public class Metric {
           "client_start_ms", "client_end_ms", "client_request_ms",
           "client_response_ms","gateway_start_ms","gateway_end_ms",
           "server_submit_ms","server_start_ms","server_plan_ms",
-          "server_dag_ms","server_resource_ms", "server_end_ms", "client_result_ms"
+          "server_dag_ms","server_resource_ms", "server_end_ms",
+          "client_result_ms", "pre_check_ms", "plan_ms", "wait_resource_ms",
+          "runtime_ms"
   }, ',');
 
   public Metric() {
@@ -82,11 +102,16 @@ public class Metric {
   public String toString() {
     long clientDuration = clientEndMs - clientStartMs;
     long serverDuration = serverEndMs - serverStartMs;
-    return String.format("%s,%s,%s,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
+    long preCheck = preCheckEndMs - preCheckStartMs;
+    long plan = planCreatedMs - sqlStartRunMs;
+    long waitResource = gotResourcedMs - planCreatedMs;
+    long runtime = dagCompletedMs - gotResourcedMs;
+    return String.format("%s,%s,%s,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d," +
+                    "%d,%d,%d,%d,%d,%d,%d",
             threadName, sqlId, isSuccess, resultSize,
             jobId, clientDuration, serverDuration,
             clientStartMs, clientEndMs, clientRequestMs, clientResponseMs, gatewayStartMs,
             gatewayEndMs, serverSubmitMs,serverStartMs, serverPlanMs, serverDagMs,
-            serverResourceMs, serverEndMs, clientResultMs);
+            serverResourceMs, serverEndMs, clientResultMs, preCheck, plan, waitResource, runtime);
   }
 }

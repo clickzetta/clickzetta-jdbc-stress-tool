@@ -3,6 +3,7 @@ package com.clickzetta.jdbc_stress_tool;
 import com.clickzetta.client.jdbc.core.CZJobMetric;
 import com.clickzetta.client.jdbc.core.CZRequestIdGenerator;
 import com.clickzetta.client.jdbc.core.CZStatement;
+import cz.proto.JobProfiling;
 import org.apache.commons.lang3.StringUtils;
 
 import java.sql.Connection;
@@ -98,6 +99,23 @@ public class CZSqlRunner extends SqlRunner {
         metric.setServerDagMs(jobMetric.getServerDagMs());
         metric.setServerResourceMs(jobMetric.getServerResourceMs());
         metric.setServerEndMs(jobMetric.getServerEndMs());
+        JobProfiling jobProfiling = czStatement.getJobStatus().getJobProfiling();
+        for (JobProfiling.JobProfilingItem item :
+                jobProfiling.getProfilingList()) {
+            if (item.getE() == 101) {
+                metric.setPreCheckStartMs(item.getT());
+            } else if (item.getE() == 102) {
+                metric.setPreCheckEndMs(item.getT());
+            } else if (item.getE() == 106) {
+                metric.setSqlStartRunMs(item.getT());
+            } else if (item.getE() == 108) {
+                metric.setPlanCreatedMs(item.getT());
+            } else if (item.getE() == 120) {
+                metric.setGotResourcedMs(item.getT());
+            } else if (item.getE() == 130) {
+                metric.setDagCompletedMs(item.getT());
+            }
+        }
     }
 
     private static void close(Connection connection) {
