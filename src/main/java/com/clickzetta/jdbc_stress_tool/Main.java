@@ -49,7 +49,7 @@ public class Main {
                 host = host.split("\\.", 2)[1];
             }
             Runtime rt = Runtime.getRuntime();
-            Process p = rt.exec("ping -c 10 " + host);
+            Process p = rt.exec(new String[]{"ping", "-c", "10", host});
             BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
             String line;
             while ((line = in.readLine()) != null) {
@@ -100,7 +100,7 @@ public class Main {
         output.write("\n");
 
         ExecutorService executorService = Executors.newFixedThreadPool(config.threadCount);
-        CompletionService completionService = new ExecutorCompletionService(executorService);
+        CompletionService<Metric> completionService = new ExecutorCompletionService<>(executorService);
         long startTimestamp = System.currentTimeMillis();
         long total = config.repeatCount * config.sqls.size();
         long fail = 0L;
@@ -115,32 +115,36 @@ public class Main {
             int c = 0;
             double q = 0;
             for (int i = 0; i < total; i++) {
-                Metric metric = (Metric)completionService.take().get();
+                Metric metric = completionService.take().get();
                 output.write(metric.toString());
                 output.write("\n");
                 if (!metric.isSuccess()) {
                     fail++;
-                    // abort test if failure rate is too high
-                    if (100.0 * fail / total > config.failureRate) {
+                    // abort test if failure rate is too high (use completed count as denominator)
+                    if (100.0 * fail / (i + 1) > config.failureRate) {
                         System.err.println("too many failed sqls, test aborted.");
+                        executorService.shutdownNow();
                         output.close();
                         System.exit(1);
                     }
                 }
-                if (System.currentTimeMillis() - t >= 10 * 1000) {
-                    q = 1000.0 * (i - c) / (System.currentTimeMillis() - t);
+                long now = System.currentTimeMillis();
+                if (now - t >= 10 * 1000) {
+                    q = 1000.0 * (i - c) / (now - t);
                     c = i;
-                    t = System.currentTimeMillis();
+                    t = now;
                     System.out.printf("[%s] %d of %d SQLs executed, %d failed, approx qps %.3f ...%n",
-                            java.time.LocalDateTime.now(), i, total, fail, q);
+                            java.time.LocalDateTime.now(), i + 1, total, fail, q);
                 }
             }
         } catch (InterruptedException e) {
             System.err.println(e.getMessage());
-            output.close();
             System.exit(1);
         } catch (ExecutionException | IOException e) {
             System.err.println(e.getMessage());
+        } finally {
+            executorService.shutdownNow();
+            output.close();
         }
         long endTimestamp = System.currentTimeMillis();
         long duration = endTimestamp - startTimestamp;
@@ -150,7 +154,10 @@ public class Main {
         System.out.println("sql    : " + total);
         System.out.println("failed : " + fail + " (" + (100.0 * fail / total) + "%)");
         System.out.printf("qps    : %.3f%n", 1.0 * total / duration * 1000);
-        output.close();
+    }
+
+    void close() {
+        cds.close();
     }
 
     public static void main(String[] args) throws IOException {
@@ -300,11 +307,10 @@ public class Main {
             }
             // multi thread run
             main.run();
-
+            main.close();
             System.exit(0);
         } catch (Throwable e) {
             System.err.println(e.getMessage());
-        } finally {
             System.exit(1);
         }
     }

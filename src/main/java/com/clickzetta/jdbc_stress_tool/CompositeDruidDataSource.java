@@ -43,4 +43,8 @@ public class CompositeDruidDataSource implements CompositeDataSource {
         return statement.unwrap(CZStatement.class);
     }
 
+    public void close() {
+        ds.close();
+    }
+
 }

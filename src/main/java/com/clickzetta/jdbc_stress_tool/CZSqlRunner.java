@@ -8,7 +8,6 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Statement;
 
 public class CZSqlRunner extends SqlRunner {
@@ -28,9 +27,8 @@ public class CZSqlRunner extends SqlRunner {
         metric.setThreadName(threadName);
         metric.setSqlId(sqlId);
         metric.setJobId(sqlId);
-        Connection connection = ds.getConnection();
-        try {
-            Statement statement = connection.createStatement();
+        try (Connection connection = ds.getConnection();
+             Statement statement = connection.createStatement()) {
             CZStatement czStatement = cds.castToCZStatement(statement);
 
             long startTime = System.currentTimeMillis();
@@ -72,9 +70,6 @@ public class CZSqlRunner extends SqlRunner {
             metric.setClientEndMs(endTime);
             metric.setServerEndMs(endTime);
             System.err.println("failed to run sql '" + sqlId + "', reason: " + e.getMessage());
-        } finally {
-            // 释放资源
-            close(connection);
         }
         return metric;
     }
@@ -118,13 +113,4 @@ public class CZSqlRunner extends SqlRunner {
         }
     }
 
-    private static void close(Connection connection) {
-        if (connection != null) {
-            try {
-                connection.close();
-            } catch (SQLException e) {
-                System.err.println("failed to close connection, reason: " + e.getMessage());
-            }
-        }
-    }
 }

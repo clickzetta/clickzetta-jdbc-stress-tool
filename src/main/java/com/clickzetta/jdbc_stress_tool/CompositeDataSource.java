@@ -15,4 +15,6 @@ public interface CompositeDataSource {
     int getTotalConnections();
 
     CZStatement castToCZStatement(Statement statement) throws SQLException;
+
+    void close();
 }

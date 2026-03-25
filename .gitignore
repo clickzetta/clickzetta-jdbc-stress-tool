@@ -1,8 +1,25 @@
 *.iml
 .idea
 .venv
+__pycache__/
+*.pyc
 target
 .vscode
+.DS_Store
+.claude
+.kiro
+
+# Maven
+*.class
+dependency-reduced-pom.xml
+
+# pytest
+.pytest_cache/
+
+# e2e test artifacts
+e2e-test/
+
+# Streamlit runtime
 streamlit/conf
 streamlit/sql
 streamlit/jdbc_jar
@@ -12,3 +29,16 @@ streamlit/config.ini.template
 streamlit/log4j.properties
 streamlit/*.log
 streamlit/*.jar
+streamlit/__pycache__/
+
+# JDBC drivers
+jdbc_jar/*.jar
+
+# Config with credentials
+conf/
+config.ini
+
+# Stress test runtime data
+data/
+download/
+*.csv

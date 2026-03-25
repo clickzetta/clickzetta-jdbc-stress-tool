@@ -26,6 +26,18 @@ st.markdown("""
     padding-top: 0.5rem;
     padding-bottom: 0rem;
     margin-top: 0.5rem;
+    overflow-y: auto !important;
+    max-height: none !important;
+}
+
+div[data-testid="stAppViewContainer"] {
+    overflow-y: auto !important;
+    height: 100vh !important;
+}
+
+html, body {
+    height: 100%;
+    overflow-y: auto !important;
 }
 
 </style>

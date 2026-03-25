@@ -44,4 +44,12 @@ public class CompositeDBCPDataSource implements CompositeDataSource {
         return statement.unwrap(CZStatement.class);
     }
 
+    public void close() {
+        try {
+            ds.close();
+        } catch (Exception e) {
+            System.err.println("failed to close dbcp datasource: " + e.getMessage());
+        }
+    }
+
 }

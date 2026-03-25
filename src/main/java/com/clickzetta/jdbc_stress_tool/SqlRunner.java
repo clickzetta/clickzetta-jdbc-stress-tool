@@ -36,9 +36,8 @@ public class SqlRunner implements Callable<Metric> {
         metric.setThreadName(threadName);
         metric.setSqlId(sqlId);
         metric.setJobId(sqlId);
-        Connection connection = ds.getConnection();
-        try {
-            Statement statement = connection.createStatement();
+        try (Connection connection = ds.getConnection();
+             Statement statement = connection.createStatement()) {
 
             long startTime = System.currentTimeMillis();
             metric.setClientStartMs(startTime);
@@ -70,20 +69,8 @@ public class SqlRunner implements Callable<Metric> {
             metric.setClientEndMs(endTime);
             metric.setServerEndMs(endTime);
             System.err.println("failed to run sql " + sqlId + ", reason: " + e.getMessage());
-        } finally {
-            close(connection);
         }
         return metric;
-    }
-
-    private static void close(Connection connection) {
-        if (connection != null) {
-            try {
-                connection.close();
-            } catch (SQLException e) {
-                System.err.println("failed to close connection, reason: " + e.getMessage());
-            }
-        }
     }
 
     public static void warmUpConnection(Connection conn, String initSqls) throws SQLException {

@@ -1,7 +1,6 @@
 package com.clickzetta.jdbc_stress_tool;
 
 import com.clickzetta.client.jdbc.core.CZStatement;
-import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.pool.HikariProxyStatement;
@@ -43,6 +42,10 @@ public class CompositeHikariDataSource implements CompositeDataSource {
 
     public CZStatement castToCZStatement(Statement statement) throws SQLException {
         return statement.unwrap(CZStatement.class);
+    }
+
+    public void close() {
+        ds.close();
     }
 
 }

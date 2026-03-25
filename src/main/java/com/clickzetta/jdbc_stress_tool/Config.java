@@ -1,5 +1,7 @@
 package com.clickzetta.jdbc_stress_tool;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -7,11 +9,13 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@Getter
+@Setter
 public class Config {
 
     public static final String CLICKZETTA_DRIVER_CLASS = "com.clickzetta.client.jdbc.ClickZettaDriver";
@@ -28,7 +32,7 @@ public class Config {
     String initSql = "select 1;";
     int threadCount = 1;
     int repeatCount = 1;
-    HashMap<String, String> sqls = new HashMap<>();
+    LinkedHashMap<String, String> sqls = new LinkedHashMap<>();
     String mode = "seq";
     String output;
     ConnectionPoolType connectionPoolType = ConnectionPoolType.HIKARI;
