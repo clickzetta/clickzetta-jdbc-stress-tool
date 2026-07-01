@@ -39,6 +39,7 @@ public class Config {
     String driverClass;
     String prefix;
     double failureRate;
+    int ping = 10;
 
     public void loadFromFile(String configFile) throws IOException {
         FileReader reader = new FileReader(configFile);
@@ -59,6 +60,7 @@ public class Config {
         output = prop.getProperty("output");
         prefix = prop.getProperty("prefix", "");
         failureRate = Double.parseDouble(prop.getProperty("failure", "10.0"));
+        ping = Integer.parseInt(prop.getProperty("ping", "10"));
         String sqlPath = prop.getProperty("sql");
         if (sqlPath != null) {
             loadSqlFiles(sqlPath);
@@ -120,6 +122,10 @@ public class Config {
             }
         }
         System.out.println("output  : " + output);
+        if (ping < 0) {
+            throw new IllegalArgumentException("ping must be >= 0");
+        }
+        System.out.println("ping    : " + (ping == 0 ? "0 (disabled)" : ping));
     }
 
     void loadSqlFiles(String sqlPath) throws IOException {

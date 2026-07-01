@@ -48,14 +48,16 @@ public class Main {
                 // remove instance part from host
                 host = host.split("\\.", 2)[1];
             }
-            Runtime rt = Runtime.getRuntime();
-            Process p = rt.exec(new String[]{"ping", "-c", "10", host});
-            BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            String line;
-            while ((line = in.readLine()) != null) {
-                System.out.println(line);
+            if (config.ping > 0) {
+                Runtime rt = Runtime.getRuntime();
+                Process p = rt.exec(new String[]{"ping", "-c", String.valueOf(config.ping), host});
+                BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                String line;
+                while ((line = in.readLine()) != null) {
+                    System.out.println(line);
+                }
+                in.close();
             }
-            in.close();
         } catch (Throwable e) {
             System.err.println("failed to ping database host, reason " + e.getMessage());
         }
@@ -232,6 +234,11 @@ public class Main {
                         .desc("test will be aborted if failure rate exceeds this value")
                         .hasArg(true).required(false)
                         .build())
+                .addOption(Option.builder()
+                        .longOpt("ping")
+                        .desc("number of ICMP packets for the pre-test host-reachability check; 0 disables it (default 10)")
+                        .hasArg(true).required(false)
+                        .build())
         ;
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
@@ -294,6 +301,9 @@ public class Main {
         }
         if (cmd.hasOption("failure")) {
             config.failureRate = Double.parseDouble(cmd.getOptionValue("failure"));
+        }
+        if (cmd.hasOption("ping")) {
+            config.ping = Integer.parseInt(cmd.getOptionValue("ping"));
         }
 
         try {

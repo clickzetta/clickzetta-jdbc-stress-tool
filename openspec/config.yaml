@@ -1,0 +1,44 @@
+schema: spec-driven
+
+context: |
+  Project: ClickZetta Lakehouse JDBC Stress Tool
+  Purpose: General-purpose JDBC stress testing tool to measure database performance
+  (QPS, latency, failure rate) under concurrent load.
+
+  Tech stack:
+  - Backend: Java 8, Maven, ClickZetta JDBC driver (provided scope)
+  - Frontend: Python 3.9+, Streamlit (web UI), Pandas, Altair
+  - Connection pools: HikariCP, DBCP, Druid
+  - Libraries: Lombok, Apache Commons (CLI, IO, Lang3)
+  - Deployment: Docker (multi-arch: amd64/arm64), exposes port 8501
+
+  Architecture:
+  - Java CLI tool (src/main/java/...): Main entry point, SQL runner, metrics
+    collection, configurable concurrency and failure thresholds
+  - Streamlit web UI (streamlit/): Interactive test configuration, real-time
+    log monitoring, result visualization (QPS charts, percentiles, timelines)
+  - Dual-layer: CLI for CI/CD automation, Web UI for interactive analysis
+
+  Key source files:
+  - Main.java: CLI entry point and stress test orchestration
+  - Config.java: Configuration management
+  - Metric.java: Performance metrics collector
+  - SqlRunner.java / CZSqlRunner.java: SQL execution runners
+  - CompositeDataSource*.java: Connection pool wrappers
+  - streamlit/main.py, run.py, view.py: Web UI
+
+  Conventions:
+  - Results stored as structured CSV files
+  - SQL files uploaded as .sql or .zip (auto-extract)
+  - Test results include client, gateway, and server-side timing breakdowns
+  - Benchmark support: TPC-H and SSB flat schemas included
+
+rules:
+  proposal:
+    - Consider both CLI and Web UI impact for any change
+    - Note if a change affects JDBC driver compatibility
+    - Explicitly call out performance implications for a stress-testing tool
+  tasks:
+    - For backend changes, include verification steps (compile, test SQL)
+    - For frontend changes, include UI interaction verification
+    - Consider Docker rebuild when dependencies change

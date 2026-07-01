@@ -232,6 +232,10 @@ with col_conf_and_run:
     failure_rate = cols[1].slider('stop test if failure rate reach', 0, 100, 10, 1,
                                   help='test will stop if failure rate of sqls exceeds this value',
                                   key='_stop_fail_rate', on_change=store_value, args=['stop_fail_rate'])
+    load_value('ping_count')
+    ping_count = cols[1].number_input('ping packets for host check (0 disables)', value=10, min_value=0, step=1,
+                                      help='ICMP packet count (ping -c N) for the pre-test host-reachability check; 0 skips it entirely',
+                                      key='_ping_count', on_change=store_value, args=['ping_count'])
 
 in_running_state = 'running_pid' in st.session_state and 'running_test' in st.session_state
 
@@ -330,6 +334,7 @@ elif run:
               f' -r {str(repeat)}' + \
               f' -t {str(thread)}' + \
               f' -f {str(failure_rate)}' + \
+              f' --ping {str(ping_count)}' + \
               f' -o {output_csv}'
         if job_id_prefix != "":
             cmd += f' --prefix {job_id_prefix}'

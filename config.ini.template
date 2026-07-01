@@ -12,3 +12,5 @@ pool=hikari|dbcp|druid
 init=set cz.optimizer.enable.result.cache=false;set cz.optimizer.enable.result.cache.reuse=false;select 1;
 # driver class, not necessary for modern jdbc drivers
 driver=com.clickzetta.client.jdbc.ClickZettaDriver
+# number of ICMP packets for the pre-test host-reachability check (ping -c N); 0 disables the check; default 10
+ping=10
